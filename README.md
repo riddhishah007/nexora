@@ -12,11 +12,11 @@ Full architecture, security model, and roadmap: see
 [`docs/architecture/PROJECT_BLUEPRINT_V1.md`](./docs/architecture/PROJECT_BLUEPRINT_V1.md).
 
 ## Status
-🚧 **Phase 7 — LLM Gateway complete.** Single `generate()` entry point over
-Gemini with model-tier routing (lite/flash/pro), Redis response caching,
-`api_usage` cost tracking, and a dev-only mock provider when no API key is
-set. Auth (JWT + refresh rotation) and Alembic migrations are live. Next:
-first agent — Search Agent (Phase 8).
+🚧 **Phase 8 — Search Agent complete.** First real agent: `POST /api/v1/agents/run`
+runs the Search Agent (`search_web` tool via Tavily → numbered-source prompt →
+LLM Gateway flash-tier synthesis with citations). Agent registry at
+`GET /api/v1/agents`. Mock fallbacks keep the whole pipeline verifiable
+without API keys. Next: Orchestrator skeleton (Phase 9) per roadmap.
 
 ## Monorepo layout
 

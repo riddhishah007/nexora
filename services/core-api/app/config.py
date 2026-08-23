@@ -39,6 +39,11 @@ class Settings(BaseSettings):
 
     redis_url: str = "redis://redis:6379/0"
 
+    search_provider: str = "tavily"
+    search_api_key: str = ""
+    search_max_results: int = 5
+    search_timeout_seconds: float = 15.0
+
     @field_validator("database_url", mode="after")
     @classmethod
     def _force_asyncpg_driver(cls, value: str) -> str:
