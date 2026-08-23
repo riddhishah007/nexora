@@ -57,8 +57,20 @@ services:
     networks:
       - nexora-net
 
-  # web (Next.js) is scaffolded in Phase 3 — intentionally not added yet
-  # to keep this phase focused on proving the backend + data layer boot.
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: nexora-web
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      - core-api
+    networks:
+      - nexora-net
 
 networks:
   nexora-net:

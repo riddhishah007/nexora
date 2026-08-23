@@ -12,14 +12,15 @@ Full architecture, security model, and roadmap: see
 [`docs/architecture/PROJECT_BLUEPRINT_V1.md`](./docs/architecture/PROJECT_BLUEPRINT_V1.md).
 
 ## Status
-🚧 **Phase 1 — Repository Setup.** Backend skeleton boots; database, auth,
-orchestrator, and agents are not implemented yet. See the roadmap in the
-blueprint for what's next.
+🚧 **Phase 3 — Frontend Foundation.** Design system + app shell live: landing
+page, login/register UI (no auth backend yet), dark-first theme per blueprint
+§20. Backend skeleton boots. Database, auth, orchestrator, and agents are not
+implemented yet. See the roadmap in the blueprint for what's next.
 
 ## Monorepo layout
 
 ```
-apps/web/           → Next.js frontend (scaffolded in Phase 3)
+apps/web/           → Next.js frontend (design system + auth UI in Phase 3)
 services/core-api/   → FastAPI backend: auth, projects, orchestrator (Phase 4+)
 services/worker/      → Background job workers (Phase 16)
 packages/agent-sdk/    → Shared Agent/Tool interfaces (Phase 9+)
