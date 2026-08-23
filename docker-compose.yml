@@ -1,0 +1,69 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: nexora-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - nexora_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - nexora-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: nexora-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - nexora_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - nexora-net
+
+  core-api:
+    build:
+      context: ./services/core-api
+      dockerfile: Dockerfile
+    container_name: nexora-core-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${CORE_API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services/core-api:/app
+    networks:
+      - nexora-net
+
+  # web (Next.js) is scaffolded in Phase 3 — intentionally not added yet
+  # to keep this phase focused on proving the backend + data layer boot.
+
+networks:
+  nexora-net:
+    driver: bridge
+
+volumes:
+  nexora_postgres_data:
+  nexora_redis_data:

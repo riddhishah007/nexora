@@ -1,55 +1,54 @@
-# NEXORA
+# Nexora — AI Command Center
 
-> **One Command. Many Agents. One Intelligent Result.**
+> One command. A team of AI agents. One intelligent result.
 
-Nexora is an AI Command Center where a central orchestrator plans your request, selects
-specialized agents from a registry, executes them with real tools (search, RAG, code
-sandbox), and streams the entire execution live to your screen — delivering one
-intelligent, cited result.
+Nexora is a multi-agent AI orchestration platform: a user issues a single
+natural-language command, an Orchestrator agent plans and delegates the work
+across specialized agents (search, documents, RAG, coding), agents execute
+using permissioned tools, and results are validated and synthesized into one
+cited, trustworthy answer — visualized live as it happens.
 
-**Status:** Phase 0 — Repository & Product Definition · [Blueprint](docs/BLUEPRINT.md) · [ADRs](docs/adr/)
+Full architecture, security model, and roadmap: see
+[`docs/architecture/PROJECT_BLUEPRINT_V1.md`](./docs/architecture/PROJECT_BLUEPRINT_V1.md).
 
-## What it does
+## Status
+🚧 **Phase 1 — Repository Setup.** Backend skeleton boots; database, auth,
+orchestrator, and agents are not implemented yet. See the roadmap in the
+blueprint for what's next.
+
+## Monorepo layout
 
 ```
-USER COMMAND
-     │
-     ▼
-ORCHESTRATOR ──► plans task ──► selects agents from registry
-     │
-     ├──► Search Agent ──┐
-     ├──► RAG Agent      ├──► validated outputs ──► SYNTHESIS ──► ANSWER + CITATIONS
-     ├──► Coding Agent   │        (schemas,              (streamed live
-     └──► Security Agent ┘         permissions)            via SSE)
+apps/web/           → Next.js frontend (scaffolded in Phase 3)
+services/core-api/   → FastAPI backend: auth, projects, orchestrator (Phase 4+)
+services/worker/      → Background job workers (Phase 16)
+packages/agent-sdk/    → Shared Agent/Tool interfaces (Phase 9+)
+infrastructure/docker/ → Extra Docker configs (nginx, monitoring — later phases)
+docs/architecture/       → Blueprint and architecture docs
 ```
 
-## Core principles
+## Running Phase 1 locally
 
-- **Security-first** — prompt-injection defense, agent permission matrix, sandboxed code execution, tenant isolation
-- **Visible orchestration** — the agent network UI renders real backend events, never fake animation
-- **$0 MVP spend** — Gemini free tier + Tavily free tier; every LLM call flows through one swappable gateway
-- **Modular monolith** — FastAPI service with strict module boundaries; microservices only when pain demands
+1. Copy environment file:
+   ```bash
+   cp .env.example .env
+   ```
+2. Start the stack:
+   ```bash
+   docker compose up --build
+   ```
+3. Verify:
+   - Core API health check: http://localhost:8000/health → `{"status":"ok",...}`
+   - Postgres is up on `localhost:5432` (pgvector extension pre-installed via the `pgvector/pgvector:pg16` image)
+   - Redis is up on `localhost:6379`
 
-## Tech stack (summary)
+## Why these technology choices (short version)
 
-| Layer | Choice |
-|---|---|
-| Frontend | Next.js · TypeScript · Tailwind · shadcn/ui · React Flow |
-| Backend | FastAPI · Python 3.12 · SQLAlchemy 2 · Alembic |
-| Data | PostgreSQL 16 + pgvector · Redis · Celery · SSE |
-| AI | LLM Gateway → Gemini (primary) · Tavily (search) · Ollama (local dev) |
-| Infra | Docker Compose · GitHub Actions · Vercel + Fly.io + Neon |
+- **pgvector, not a separate vector DB** — one less service to run/secure at this scale.
+- **Redis, not Kafka/RabbitMQ** — doubles as cache + queue with zero extra infra.
+- **Modular monolith for MVP, not 10 microservices** — services get extracted only when there's a real scaling/isolation reason (see Blueprint §17).
 
-Full stack rationale and architecture: see [docs/BLUEPRINT.md](docs/BLUEPRINT.md).
-
-## Documentation
-
-| Doc | Purpose |
-|---|---|
-| [docs/BLUEPRINT.md](docs/BLUEPRINT.md) | Approved system architecture & roadmap |
-| [docs/PRODUCT.md](docs/PRODUCT.md) | Vision, taglines, brand identity |
-| [docs/adr/](docs/adr/) | Architecture Decision Records |
+Full reasoning for every decision is in the blueprint doc linked above.
 
 ## License
-
-[MIT](LICENSE)
+TBD.
