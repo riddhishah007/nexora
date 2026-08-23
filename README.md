@@ -12,11 +12,12 @@ Full architecture, security model, and roadmap: see
 [`docs/architecture/PROJECT_BLUEPRINT_V1.md`](./docs/architecture/PROJECT_BLUEPRINT_V1.md).
 
 ## Status
-🚧 **Phase 8 — Search Agent complete.** First real agent: `POST /api/v1/agents/run`
-runs the Search Agent (`search_web` tool via Tavily → numbered-source prompt →
-LLM Gateway flash-tier synthesis with citations). Agent registry at
-`GET /api/v1/agents`. Mock fallbacks keep the whole pipeline verifiable
-without API keys. Next: Orchestrator skeleton (Phase 9) per roadmap.
+🚧 **Phase 9 — Orchestrator skeleton complete.** `POST /api/v1/chat` now runs
+the full loop: LLM planner decomposes the message into a step DAG
+(`workflow_steps`), a sequential executor walks the DAG and dispatches
+registered agents, results persist to `conversations`/`messages`/`workflows`.
+With real keys the planner emits genuine multi-step plans; mock fallbacks
+keep dev verifiable offline. Next: Tool system registry (Phase 10).
 
 ## Monorepo layout
 
