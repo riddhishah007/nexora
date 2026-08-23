@@ -1,4 +1,5 @@
 import asyncio
+import re
 import time
 from typing import Any
 
@@ -6,6 +7,12 @@ import httpx
 
 from app.config import settings
 from app.llm.schemas import LLMResponse
+
+_THINK_RE = re.compile(r"<think>.*?</think>\s*", flags=re.DOTALL)
+
+
+def _strip_reasoning(text: str) -> str:
+    return _THINK_RE.sub("", text).strip()
 
 
 class GroqProvider:
@@ -70,7 +77,7 @@ class GroqProvider:
             text = message.get("content") or ""
 
         return LLMResponse(
-            text=text,
+            text=_strip_reasoning(text),
             provider="groq",
             model=data.get("model", model),
             tokens_in=int(usage.get("prompt_tokens", 0) or 0),

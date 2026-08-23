@@ -32,9 +32,9 @@ class Settings(BaseSettings):
 
     groq_api_key: str = ""
     groq_base_url: str = "https://api.groq.com/openai/v1"
-    groq_model_lite: str = "llama-3.1-8b-instant"
-    groq_model_flash: str = "llama-3.3-70b-versatile"
-    groq_model_pro: str = "llama-3.3-70b-versatile"
+    groq_model_lite: str = "openai/gpt-oss-20b"
+    groq_model_flash: str = "qwen/qwen3.6-27b"
+    groq_model_pro: str = "openai/gpt-oss-120b"
 
     llm_model_lite: str = "gemini-2.5-flash-lite"
     llm_model_flash: str = "gemini-2.5-flash"
