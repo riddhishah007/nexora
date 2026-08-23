@@ -1,23 +1,57 @@
+from typing import Any
+
 import httpx
+from pydantic import BaseModel, Field
 
 from app.config import settings
+from app.tools.base import ToolContext, ToolDefinition
+
+
+class SearchWebInput(BaseModel):
+    query: str = Field(min_length=1, max_length=500)
 
 
 class SearchWebTool:
-    """Blueprint §8 tool: search_web. Search Agent's only MVP tool.
+    """Blueprint §8 tool: search_web. Search Agent's MVP capability.
 
-    Permission: network:read — outbound GET/POST to the allow-listed
-    Tavily endpoint only (§9). With no SEARCH_API_KEY set in development,
-    returns deterministic mock results so the agent pipeline is verifiable
-    offline; production refuses to start without a key.
+    Permission: network:read — outbound POST to the allow-listed Tavily
+    endpoint only (§9). With no SEARCH_API_KEY set in development, returns
+    deterministic mock results so the pipeline stays verifiable offline;
+    production refuses to run without a key.
     """
 
     TAVILY_SEARCH_URL = "https://api.tavily.com/search"
 
-    async def search(self, query: str) -> list[dict]:
+    definition = ToolDefinition(
+        tool_id="search_web",
+        name="Search Web",
+        description="Searches the public web (Tavily) and returns ranked "
+        "results with title, url, snippet and score.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "minLength": 1, "maxLength": 500}
+            },
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+        required_permission="network:read",
+        trust_level="medium",
+        timeout_seconds=settings.search_timeout_seconds,
+    )
+
+    async def run(self, payload: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
+        SearchWebInput.model_validate(payload)
+        query = payload["query"]
         if not self._key_configured():
-            return self._mock_results(query)
-        return await self._tavily_search(query)
+            return {
+                "mock": True,
+                "results": self._mock_results(query),
+            }
+        return {
+            "mock": False,
+            "results": await self._tavily_search(query),
+        }
 
     @staticmethod
     def _key_configured() -> bool:

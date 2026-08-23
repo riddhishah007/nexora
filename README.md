@@ -12,12 +12,13 @@ Full architecture, security model, and roadmap: see
 [`docs/architecture/PROJECT_BLUEPRINT_V1.md`](./docs/architecture/PROJECT_BLUEPRINT_V1.md).
 
 ## Status
-🚧 **Phase 9 — Orchestrator skeleton complete.** `POST /api/v1/chat` now runs
-the full loop: LLM planner decomposes the message into a step DAG
-(`workflow_steps`), a sequential executor walks the DAG and dispatches
-registered agents, results persist to `conversations`/`messages`/`workflows`.
-With real keys the planner emits genuine multi-step plans; mock fallbacks
-keep dev verifiable offline. Next: Tool system registry (Phase 10).
+🚧 **Phase 10 — Tool system complete.** Every tool call now flows through a
+central `ToolRegistry` (blueprint §8): JSON-Schema input validation →
+permission check against the calling agent (§9) → execution under a hard
+timeout → sanitized audit row in `tool_calls`. Two tools are registered
+(`search_web` via Tavily, `fetch_page` with an SSRF guard); the Search
+Agent reaches the network only through the registry, and `GET /api/v1/tools`
+exposes the enforceable catalog. Next: PDF Agent (Phase 11).
 
 ## Monorepo layout
 

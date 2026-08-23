@@ -1,8 +1,10 @@
 import time
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.llm.gateway import LLMGateway
 from app.llm.schemas import LLMResponse, ModelTier
-from app.tools.search_web import SearchWebTool
+from app.tools import ToolContext, ToolRegistry
 
 SYNTHESIS_SYSTEM = (
     "You are the Nexora Search Agent. You answer user queries using ONLY "
@@ -15,20 +17,47 @@ SYNTHESIS_SYSTEM = (
 class SearchAgent:
     """Blueprint §6 registry entry 'search-agent' — MVP's first real agent.
 
-    Flow: search_web tool (§8) -> numbered source block -> LLM Gateway
-    synthesis (flash tier, §11). The agent holds no provider keys and has
-    no other capabilities (§9: network:read only).
+    Flow: search_web tool via the ToolRegistry (§8) -> numbered source
+    block -> LLM Gateway synthesis (flash tier, §11). The agent holds no
+    provider keys; its only power is network:read (§9), enforced by the
+    registry, not by this class.
     """
 
     agent_id = "search-agent"
+    permissions = ["network:read"]
 
-    def __init__(self, gateway: LLMGateway, search_tool: SearchWebTool | None = None):
+    def __init__(
+        self,
+        gateway: LLMGateway,
+        registry: ToolRegistry | None = None,
+        user_id: str | None = None,
+    ):
         self._gateway = gateway
-        self._search = search_tool or SearchWebTool()
+        self._tools = registry
+        self._user_id = user_id
 
-    async def run(self, query: str) -> tuple[str, list[dict], LLMResponse]:
+    @property
+    def tools(self) -> ToolContext:
+        return ToolContext(
+            agent_id=self.agent_id,
+            user_id=self._user_id,
+            permissions=self.permissions,
+        )
+
+    async def run(
+        self, query: str, db: AsyncSession | None = None
+    ) -> tuple[str, list[dict], LLMResponse]:
         started = time.perf_counter()
-        results = await self._search.search(query)
+        results: list[dict] = []
+
+        if self._tools is not None:
+            result = await self._tools.execute(
+                "search_web", {"query": query}, self.tools, db=db
+            )
+            if result.ok:
+                results = [
+                    r for r in (result.data or {}).get("results", []) if r.get("url")
+                ]
 
         if not results:
             text = (

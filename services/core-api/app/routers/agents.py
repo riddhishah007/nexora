@@ -40,7 +40,7 @@ async def run_agent(
         )
 
     try:
-        answer, results, llm = await search_agent.run(payload.input.query)
+        answer, results, llm = await search_agent.run(payload.input.query, db)
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

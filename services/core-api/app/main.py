@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import app.models  # noqa: F401 — ensure model metadata is registered
 from app.config import settings
 from app.database import engine
-from app.routers import agents, auth, chat, health, llm, workflows
+from app.routers import agents, auth, chat, health, llm, tools, workflows
 
 
 @asynccontextmanager
@@ -34,6 +34,7 @@ app.include_router(health.router)
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(llm.router, prefix="/api/v1")
 app.include_router(agents.router, prefix="/api/v1")
+app.include_router(tools.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
 app.include_router(workflows.router, prefix="/api/v1")
 

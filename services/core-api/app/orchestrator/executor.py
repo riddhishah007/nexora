@@ -39,7 +39,7 @@ async def execute_workflow(
 
         for step in runnable:
             try:
-                output, llm = await _run_step(step)
+                output, llm = await _run_step(db, step)
                 await LLMGateway.record_usage(db, user_id, llm)
                 step.output = output
                 step.status = STEP_DONE
@@ -55,12 +55,12 @@ async def execute_workflow(
     return all_ok
 
 
-async def _run_step(step: WorkflowStep) -> tuple[dict, object]:
+async def _run_step(db: AsyncSession, step: WorkflowStep) -> tuple[dict, object]:
     agent = AGENT_REGISTRY.get(step.agent_id)
     if agent is None:
         raise StepFailure(f"agent '{step.agent_id}' not registered")
 
-    answer, sources, llm = await agent.run(step.instruction)
+    answer, sources, llm = await agent.run(step.instruction, db)
     return (
         {
             "answer": answer,

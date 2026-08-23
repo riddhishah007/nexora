@@ -1,3 +1,3 @@
-from app.routers import agents, auth, chat, health, llm, workflows
+from app.routers import agents, auth, chat, health, llm, tools, workflows
 
-__all__ = ["agents", "auth", "chat", "health", "llm", "workflows"]
+__all__ = ["agents", "auth", "chat", "health", "llm", "tools", "workflows"]
