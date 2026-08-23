@@ -2,6 +2,7 @@ from typing import Any
 
 import httpx
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.tools.base import ToolContext, ToolDefinition, ToolExecutionError
@@ -61,7 +62,12 @@ class FetchPageTool:
         timeout_seconds=settings.fetch_page_timeout_seconds,
     )
 
-    async def run(self, payload: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
+    async def run(
+        self,
+        payload: dict[str, Any],
+        ctx: ToolContext,
+        db: AsyncSession | None = None,
+    ) -> dict[str, Any]:
         FetchPageInput.model_validate(payload)
         url = payload["url"]
 

@@ -1,3 +1,4 @@
+from app.agents.pdf_agent import PdfAgent
 from app.agents.search_agent import SearchAgent
 from app.agents.schemas import AgentInfo
 from app.llm import get_llm_gateway
@@ -8,9 +9,11 @@ _gateway: LLMGateway = get_llm_gateway()
 _tools = get_tool_registry()
 
 search_agent = SearchAgent(gateway=_gateway, registry=_tools)
+pdf_agent = PdfAgent(gateway=_gateway, registry=_tools)
 
 AGENT_REGISTRY: dict[str, object] = {
     SearchAgent.agent_id: search_agent,
+    PdfAgent.agent_id: pdf_agent,
 }
 
 REGISTRY_INFO: list[AgentInfo] = [
@@ -23,6 +26,19 @@ REGISTRY_INFO: list[AgentInfo] = [
         supported_tasks=["search", "fact_lookup"],
         tools=["search_web", "fetch_page"],
         permissions=["network:read"],
+        model=_gateway.model_for_tier("flash"),
+        status="active",
+        cost_profile="low",
+    ),
+    AgentInfo(
+        agent_id="pdf-agent",
+        name="PDF Agent",
+        version="1.0.0",
+        description="Reads a user-uploaded PDF and returns a page-cited summary.",
+        capabilities=["pdf_parse", "text_extraction", "summarization"],
+        supported_tasks=["pdf_summary", "document_review"],
+        tools=["parse_pdf", "extract_text"],
+        permissions=["file:read"],
         model=_gateway.model_for_tier("flash"),
         status="active",
         cost_profile="low",

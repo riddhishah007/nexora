@@ -109,7 +109,7 @@ class ToolRegistry:
 
         try:
             data = await asyncio.wait_for(
-                tool.run(payload or {}, ctx),
+                tool.run(payload or {}, ctx, db=db),
                 timeout=tool.definition.timeout_seconds,
             )
         except asyncio.TimeoutError:
@@ -124,7 +124,8 @@ class ToolRegistry:
             )
             return ToolResult(ok=False, error=error, status=STATUS_FAILED)
         except Exception as exc:
-            error = f"tool '{tool_id}' execution failed: {type(exc).__name__}"
+            detail = f"{exc}".strip() or type(exc).__name__
+            error = f"tool '{tool_id}' execution failed: {detail}"[:500]
             await self._audit(
                 db, ctx, tool.definition, STATUS_FAILED,
                 input_payload=payload, error=error,
@@ -188,12 +189,16 @@ class ToolRegistry:
 
 
 def build_registry() -> ToolRegistry:
+    from app.tools.extract_text import ExtractTextTool
     from app.tools.fetch_page import FetchPageTool
+    from app.tools.parse_pdf import ParsePdfTool
     from app.tools.search_web import SearchWebTool
 
     registry = ToolRegistry()
     registry.register(SearchWebTool())
     registry.register(FetchPageTool())
+    registry.register(ParsePdfTool())
+    registry.register(ExtractTextTool())
     return registry
 
 

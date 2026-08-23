@@ -57,6 +57,7 @@ services:
              uvicorn app.main:app --host 0.0.0.0 --port 8000"
     volumes:
       - ./services/core-api:/app
+      - nexora_file_storage:/app/storage
     networks:
       - nexora-net
 
@@ -82,3 +83,4 @@ networks:
 volumes:
   nexora_postgres_data:
   nexora_redis_data:
+  nexora_file_storage:

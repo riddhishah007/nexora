@@ -12,13 +12,13 @@ Full architecture, security model, and roadmap: see
 [`docs/architecture/PROJECT_BLUEPRINT_V1.md`](./docs/architecture/PROJECT_BLUEPRINT_V1.md).
 
 ## Status
-🚧 **Phase 10 — Tool system complete.** Every tool call now flows through a
-central `ToolRegistry` (blueprint §8): JSON-Schema input validation →
-permission check against the calling agent (§9) → execution under a hard
-timeout → sanitized audit row in `tool_calls`. Two tools are registered
-(`search_web` via Tavily, `fetch_page` with an SSRF guard); the Search
-Agent reaches the network only through the registry, and `GET /api/v1/tools`
-exposes the enforceable catalog. Next: PDF Agent (Phase 11).
+🚧 **Phase 11 — PDF Agent complete.** `POST /api/v1/documents` validates
+(§25: PDF-only, 20 MB cap, magic-byte check, randomized storage), two new
+registry tools enforce per-user isolation (`parse_pdf`, `extract_text` —
+`file:read`, only own uploads), and the PDF Agent (`POST /api/v1/pdf/summarize`)
+extracts text with `pypdf` and asks the LLM Gateway (flash tier) for a
+page-cited summary. `agent_id="pdf-agent"` is discoverable at `GET /api/v1/agents`
+and `GET /api/v1/tools`. Next: RAG (pgvector) — Phase 12.
 
 ## Monorepo layout
 

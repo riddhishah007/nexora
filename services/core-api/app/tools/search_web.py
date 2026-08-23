@@ -2,6 +2,7 @@ from typing import Any
 
 import httpx
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.tools.base import ToolContext, ToolDefinition
@@ -40,7 +41,12 @@ class SearchWebTool:
         timeout_seconds=settings.search_timeout_seconds,
     )
 
-    async def run(self, payload: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
+    async def run(
+        self,
+        payload: dict[str, Any],
+        ctx: ToolContext,
+        db: AsyncSession | None = None,
+    ) -> dict[str, Any]:
         SearchWebInput.model_validate(payload)
         query = payload["query"]
         if not self._key_configured():

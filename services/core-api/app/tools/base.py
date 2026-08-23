@@ -120,10 +120,16 @@ def sanitize(value: Any, _depth: int = 0) -> Any:
 class NexoraTool(Protocol):
     """Contract every registered tool fulfils.
 
-    `run` receives an already schema-validated input plus the caller's
-    context; it returns a JSON-serializable dict or raises.
+    `run` receives an already schema-validated input, the caller's
+    context, and an optional request-scoped DB session; it returns a
+    JSON-serializable dict or raises.
     """
 
     definition: ToolDefinition
 
-    async def run(self, payload: dict[str, Any], ctx: ToolContext) -> dict[str, Any]: ...
+    async def run(
+        self,
+        payload: dict[str, Any],
+        ctx: ToolContext,
+        db: Any | None = None,
+    ) -> dict[str, Any]: ...

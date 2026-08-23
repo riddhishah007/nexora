@@ -55,6 +55,10 @@ class Settings(BaseSettings):
     fetch_page_timeout_seconds: float = 15.0
     fetch_page_max_bytes: int = 200_000
 
+    file_storage_path: str = "/app/storage"
+    max_upload_size_mb: int = 20
+    pdf_extract_max_chars: int = 120_000
+
     @field_validator("database_url", mode="after")
     @classmethod
     def _force_asyncpg_driver(cls, value: str) -> str:

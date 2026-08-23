@@ -45,14 +45,22 @@ class SearchAgent:
         )
 
     async def run(
-        self, query: str, db: AsyncSession | None = None
+        self,
+        query: str,
+        db: AsyncSession | None = None,
+        user_id: str | None = None,
     ) -> tuple[str, list[dict], LLMResponse]:
         started = time.perf_counter()
         results: list[dict] = []
 
         if self._tools is not None:
+            ctx = ToolContext(
+                agent_id=self.agent_id,
+                user_id=user_id or self._user_id,
+                permissions=self.permissions,
+            )
             result = await self._tools.execute(
-                "search_web", {"query": query}, self.tools, db=db
+                "search_web", {"query": query}, ctx, db=db
             )
             if result.ok:
                 results = [
