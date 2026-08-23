@@ -26,7 +26,15 @@ class Settings(BaseSettings):
     core_api_port: int = 8000
     cors_allowed_origins: str = "http://localhost:3000"
 
+    llm_provider: str = "gemini"  # gemini | groq
+
     gemini_api_key: str = ""
+
+    groq_api_key: str = ""
+    groq_base_url: str = "https://api.groq.com/openai/v1"
+    groq_model_lite: str = "llama-3.1-8b-instant"
+    groq_model_flash: str = "llama-3.3-70b-versatile"
+    groq_model_pro: str = "llama-3.3-70b-versatile"
 
     llm_model_lite: str = "gemini-2.5-flash-lite"
     llm_model_flash: str = "gemini-2.5-flash"

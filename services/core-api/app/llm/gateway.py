@@ -47,11 +47,21 @@ class LLMGateway:
 
     @staticmethod
     def model_for_tier(tier: str) -> str:
-        if tier == ModelTier.LITE:
-            return settings.llm_model_lite
-        if tier == ModelTier.PRO:
-            return settings.llm_model_pro
-        return settings.llm_model_flash
+        if settings.llm_provider == "groq":
+            return (
+                settings.groq_model_lite
+                if tier == ModelTier.LITE
+                else settings.groq_model_pro
+                if tier == ModelTier.PRO
+                else settings.groq_model_flash
+            )
+        return (
+            settings.llm_model_lite
+            if tier == ModelTier.LITE
+            else settings.llm_model_pro
+            if tier == ModelTier.PRO
+            else settings.llm_model_flash
+        )
 
     async def _cache_get(self, key: str) -> LLMResponse | None:
         if self._redis is None:
@@ -138,15 +148,38 @@ class LLMGateway:
         await db.commit()
 
 
+def _key_set(key: str) -> bool:
+    key = key.strip()
+    return bool(key) and not key.lower().startswith("your")
+
+
 def build_gateway() -> LLMGateway:
-    if settings.gemini_api_key and settings.gemini_api_key != "your_gemini_api_key_here":
-        provider: Provider = GeminiProvider(api_key=settings.gemini_api_key)
-    elif settings.environment == "development":
-        provider = MockProvider()
-    else:
-        raise RuntimeError(
-            "GEMINI_API_KEY is required when ENVIRONMENT != development"
+    from app.llm.providers.groq import GroqProvider
+
+    provider_name = settings.llm_provider.strip().lower()
+    provider: Provider | None = None
+
+    if provider_name == "groq" and _key_set(settings.groq_api_key):
+        provider = GroqProvider(api_key=settings.groq_api_key)
+    elif provider_name == "gemini" and _key_set(settings.gemini_api_key):
+        provider = GeminiProvider(api_key=settings.gemini_api_key)
+    elif _key_set(settings.gemini_api_key) or _key_set(settings.groq_api_key):
+        # Provider requested but its key missing -> fall back to whichever
+        # key exists rather than failing outright.
+        provider = (
+            GroqProvider(api_key=settings.groq_api_key)
+            if _key_set(settings.groq_api_key)
+            else GeminiProvider(api_key=settings.gemini_api_key)
         )
+
+    if provider is None:
+        if settings.environment == "development":
+            provider = MockProvider()
+        else:
+            raise RuntimeError(
+                "A provider API key (GEMINI_API_KEY or GROQ_API_KEY) is "
+                "required when ENVIRONMENT != development"
+            )
 
     redis_client: Redis | None = None
     if settings.redis_url:
