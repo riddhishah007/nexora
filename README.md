@@ -12,10 +12,11 @@ Full architecture, security model, and roadmap: see
 [`docs/architecture/PROJECT_BLUEPRINT_V1.md`](./docs/architecture/PROJECT_BLUEPRINT_V1.md).
 
 ## Status
-🚧 **Phase 3 — Frontend Foundation.** Design system + app shell live: landing
-page, login/register UI (no auth backend yet), dark-first theme per blueprint
-§20. Backend skeleton boots. Database, auth, orchestrator, and agents are not
-implemented yet. See the roadmap in the blueprint for what's next.
+🚧 **Phase 6 — Database Foundation + Auth complete.** JWT auth works
+end-to-end (register / login / refresh rotation / logout / me) with bcrypt
+hashing, session-based refresh tokens, RBAC roles, and Alembic migrations
+(`organizations`, `users`, `sessions`). Frontend has design system, landing
+page, and auth UI wired for the API contract. Next: LLM Gateway (Phase 7).
 
 ## Monorepo layout
 
