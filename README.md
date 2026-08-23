@@ -12,11 +12,11 @@ Full architecture, security model, and roadmap: see
 [`docs/architecture/PROJECT_BLUEPRINT_V1.md`](./docs/architecture/PROJECT_BLUEPRINT_V1.md).
 
 ## Status
-🚧 **Phase 6 — Database Foundation + Auth complete.** JWT auth works
-end-to-end (register / login / refresh rotation / logout / me) with bcrypt
-hashing, session-based refresh tokens, RBAC roles, and Alembic migrations
-(`organizations`, `users`, `sessions`). Frontend has design system, landing
-page, and auth UI wired for the API contract. Next: LLM Gateway (Phase 7).
+🚧 **Phase 7 — LLM Gateway complete.** Single `generate()` entry point over
+Gemini with model-tier routing (lite/flash/pro), Redis response caching,
+`api_usage` cost tracking, and a dev-only mock provider when no API key is
+set. Auth (JWT + refresh rotation) and Alembic migrations are live. Next:
+first agent — Search Agent (Phase 8).
 
 ## Monorepo layout
 

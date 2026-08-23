@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import app.models  # noqa: F401 — ensure model metadata is registered
 from app.config import settings
 from app.database import engine
-from app.routers import auth, health
+from app.routers import auth, health, llm
 
 
 @asynccontextmanager
@@ -32,6 +32,7 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(auth.router, prefix="/api/v1")
+app.include_router(llm.router, prefix="/api/v1")
 
 
 @app.get("/")

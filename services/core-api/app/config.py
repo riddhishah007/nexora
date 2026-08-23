@@ -26,6 +26,19 @@ class Settings(BaseSettings):
     core_api_port: int = 8000
     cors_allowed_origins: str = "http://localhost:3000"
 
+    gemini_api_key: str = ""
+
+    llm_model_lite: str = "gemini-2.5-flash-lite"
+    llm_model_flash: str = "gemini-2.5-flash"
+    llm_model_pro: str = "gemini-2.5-pro"
+    llm_embedding_model: str = "text-embedding-004"
+
+    llm_max_output_tokens: int = 2048
+    llm_request_timeout_seconds: float = 60.0
+    llm_cache_ttl_seconds: int = 3600
+
+    redis_url: str = "redis://redis:6379/0"
+
     @field_validator("database_url", mode="after")
     @classmethod
     def _force_asyncpg_driver(cls, value: str) -> str:
