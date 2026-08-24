@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents import AGENT_REGISTRY
 from app.database import SessionFactory
+from app.events.bus import emit
 from app.llm.gateway import LLMGateway
 from app.llm.schemas import ModelTier
 from app.models.workflow import STEP_DONE, STEP_FAILED, STEP_RUNNING, WorkflowStep
@@ -39,6 +40,10 @@ async def execute_workflow(
     done: set[int] = set()
     pending = sorted(steps, key=lambda s: s.seq)
     all_ok = True
+    workflow_id = str(steps[0].workflow_id) if steps else None
+
+    if workflow_id:
+        await emit(workflow_id, "WORKFLOW_STARTED", {"steps": len(steps), "user_id": str(user_id)})
 
     while pending:
         runnable = [s for s in pending if set(s.depends_on or []) <= done]
@@ -46,13 +51,22 @@ async def execute_workflow(
             for s in pending:
                 s.status = STEP_FAILED
                 s.output = {"error": "unresolvable dependencies (cycle or missing dep)"}
+                if workflow_id:
+                    await emit(workflow_id, "AGENT_FAILED", {"seq": s.seq, "agent_id": s.agent_id, "error": "unresolvable dependencies"})
             await db.commit()
+            if workflow_id:
+                await emit(workflow_id, "WORKFLOW_COMPLETED", {"ok": False, "reason": "unresolvable dependencies"})
             all_ok = False
             break
 
         for s in runnable:
             s.status = STEP_RUNNING
+            if workflow_id:
+                await emit(workflow_id, "AGENT_SELECTED", {"seq": s.seq, "agent_id": s.agent_id, "instruction": s.instruction})
         await db.commit()
+        for s in runnable:
+            if workflow_id:
+                await emit(workflow_id, "AGENT_STARTED", {"seq": s.seq, "agent_id": s.agent_id})
 
         # Run the batch concurrently — isolated sessions inside each task.
         results = await asyncio.gather(
@@ -64,21 +78,29 @@ async def execute_workflow(
             if isinstance(res, Exception):
                 step.status = STEP_FAILED
                 step.output = {"error": str(res)[:500], "agent_id": step.agent_id}
+                if workflow_id:
+                    await emit(workflow_id, "AGENT_FAILED", {"seq": step.seq, "agent_id": step.agent_id, "error": str(res)[:200]})
                 all_ok = False
                 continue
             output, llm, err = res  # type: ignore[misc]
             if err is not None:
                 step.status = STEP_FAILED
                 step.output = {"error": str(err)[:500], "agent_id": step.agent_id, "provider": getattr(llm, "provider", "none")}
+                if workflow_id:
+                    await emit(workflow_id, "AGENT_FAILED", {"seq": step.seq, "agent_id": step.agent_id, "error": str(err)[:200]})
                 all_ok = False
             else:
                 step.status = STEP_DONE
                 step.output = output
                 done.add(step.seq)
+                if workflow_id:
+                    await emit(workflow_id, "AGENT_COMPLETED", {"seq": step.seq, "agent_id": step.agent_id})
                 # usage already recorded inside isolated session; also record on caller's session for dashboard? noop.
         await db.commit()
         pending = [s for s in pending if s.seq not in {r.seq for r in runnable}]
 
+    if workflow_id:
+        await emit(workflow_id, "WORKFLOW_COMPLETED", {"ok": all_ok, "done": len(done), "total": len(steps)})
     return all_ok
 
 

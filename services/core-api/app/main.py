@@ -16,6 +16,7 @@ from app.routers import (
     llm,
     pdf,
     rag,
+    realtime,
     tools,
     workflows,
 )
@@ -52,6 +53,7 @@ app.include_router(documents.router, prefix="/api/v1")
 app.include_router(pdf.router, prefix="/api/v1")
 app.include_router(rag.router, prefix="/api/v1")
 app.include_router(code.router, prefix="/api/v1")
+app.include_router(realtime.router, prefix="/api/v1")
 app.include_router(workflows.router, prefix="/api/v1")
 
 

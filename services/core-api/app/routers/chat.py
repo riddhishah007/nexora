@@ -124,6 +124,15 @@ async def chat(
     workflow.status = STATUS_RUNNING
     await db.commit()
 
+    # Phase 15: emit TASK_CREATED / AGENT_SELECTED early
+    try:
+        from app.events.bus import emit as _emit
+        await _emit(str(workflow.id), "TASK_CREATED", {"conversation_id": str(conversation.id), "steps": len(step_rows), "agents": [s.agent_id for s in step_rows]})
+        for s in step_rows:
+            await _emit(str(workflow.id), "AGENT_SELECTED", {"seq": s.seq, "agent_id": s.agent_id})
+    except Exception:
+        pass
+
     ok = await execute_workflow(db, step_rows, current_user.id)
     workflow.status = STATUS_DONE if ok else STATUS_FAILED
 
@@ -135,12 +144,22 @@ async def chat(
         except Exception:
             pass
         final_answer = synth_text
+        try:
+            from app.events.bus import emit as _emit2
+            await _emit2(str(workflow.id), "FINAL_RESPONSE_READY", {"synthesized": True, "length": len(final_answer)})
+        except Exception:
+            pass
     else:
         # single-step or no synthesis needed
         final_answer = synth_text if synth_text else next(
             (s.output.get("answer") for s in reversed(step_rows) if s.output and "answer" in s.output),
             "Plan executed.",
         )
+        try:
+            from app.events.bus import emit as _emit3
+            await _emit3(str(workflow.id), "FINAL_RESPONSE_READY", {"synthesized": False, "length": len(final_answer)})
+        except Exception:
+            pass
     db.add(
         Message(
             conversation_id=conversation.id,

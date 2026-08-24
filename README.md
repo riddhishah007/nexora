@@ -12,7 +12,7 @@ Full architecture, security model, and roadmap: see
 [`docs/architecture/PROJECT_BLUEPRINT_V1.md`](./docs/architecture/PROJECT_BLUEPRINT_V1.md).
 
 ## Status
-🚧 **Phase 14 — Parallel DAG + synthesis complete.** Orchestrator now walks the DAG in concurrent batches (`asyncio.gather` + per-step isolated DB sessions) — `search`+`rag` with `depends_on=[]` run together. `GroqProvider` retries `429` (3 attempts, backoff). `chat` synthesizes multi-branch outputs via flash-tier LLM (`[search:1]`, `[rag:1]` citations). Verified live: `POST /api/v1/chat` → 2 parallel steps (`search-agent` + `rag-agent`) both `done`, synthesis combines Python web results + pgvector citations, `429` retry handles bursts; single-step chat still `done`. Next: Real-time agent network (WebSocket + event bus) — Phase 15.
+🚧 **Phase 15 — Real-time agent network complete.** Redis pub/sub bus (`nexora:workflow:{id}`) + `WebSocket /api/v1/ws/workflows/{id}?token=...` (JWT via `?token` or `Authorization`, workflow ownership check, `CONNECTED` snapshot + live `AGENT_SELECTED/STARTED/COMPLETED/FAILED`, `WORKFLOW_STARTED/COMPLETED`, `FINAL_RESPONSE_READY`; polling fallback when Redis unavailable). Executor and `chat` now `emit` every transition (isolated sessions, best-effort). Verified live: `chat` → 2 parallel steps (`search+rag`) both `done` + synthesis, WS receives `CONNECTED` + manual `PUBLISH AGENT_STARTED` → live `recv`, single-step still `done`. Next: Background workers / queue — Phase 16.
 
 ## Monorepo layout
 
