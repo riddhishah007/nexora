@@ -2,13 +2,16 @@
 # Connect this repo to Render (https://dashboard.render.com/blueprints) and it will create all services.
 # Then set the secrets below in Render dashboard > Environment.
 
-services:
-  # --- Postgres with pgvector (managed) — if pgvector missing, fallback to Docker pserv ---
-  - type: psql
-    name: nexora-postgres
+databases:
+  - name: nexora-postgres
     plan: starter
     ipAllowList: []
+    # Note: Render managed Postgres may not have pgvector pre-installed.
+    # If migration CREATE EXTENSION vector fails, switch this DB to a Docker pserv
+    # with image pgvector/pgvector:pg16 via infrastructure/docker/postgres/Dockerfile
+    # and set DATABASE_URL manually to postgresql://nexora:<password>@nexora-postgres:5432/nexora
 
+services:
   # --- Redis ---
   - type: redis
     name: nexora-redis
