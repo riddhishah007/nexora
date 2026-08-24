@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Check, Eye, EyeOff, Loader2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { apiFetch, setToken } from "@/lib/api";
 
 type Rule = { label: string; test: (value: string) => boolean };
 
@@ -29,12 +31,34 @@ export function RegisterForm() {
   const [pending, setPending] = React.useState(false);
   const [showPassword, setShowPassword] = React.useState(false);
   const [password, setPassword] = React.useState("");
+  const [error, setError] = React.useState<string | null>(null);
+  const router = useRouter();
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPending(true);
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    setPending(false);
+    setError(null);
+    const fd = new FormData(event.currentTarget as HTMLFormElement);
+    const name = String(fd.get("name") || "").trim() || undefined;
+    const email = String(fd.get("email") || "").trim();
+    const pwd = String(fd.get("password") || "");
+    try {
+      await apiFetch("/auth/register", {
+        method: "POST",
+        body: JSON.stringify({ email, password: pwd, name }),
+      });
+      const login = await apiFetch<{ access_token: string; refresh_token: string }>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password: pwd }),
+      });
+      setToken(login.access_token);
+      if (login.refresh_token) localStorage.setItem("nexora_refresh", login.refresh_token);
+      router.push("/workflows");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Registration failed");
+    } finally {
+      setPending(false);
+    }
   }
 
   return (
@@ -51,6 +75,7 @@ export function RegisterForm() {
             <Label htmlFor="name">Name</Label>
             <Input
               id="name"
+              name="name"
               placeholder="Ada Lovelace"
               autoComplete="name"
               required
@@ -60,6 +85,7 @@ export function RegisterForm() {
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
+              name="email"
               type="email"
               placeholder="you@example.com"
               autoComplete="email"
@@ -71,6 +97,7 @@ export function RegisterForm() {
             <div className="relative">
               <Input
                 id="password"
+                name="password"
                 type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 autoComplete="new-password"
@@ -114,6 +141,7 @@ export function RegisterForm() {
               })}
             </ul>
           </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
           <Button type="submit" disabled={pending}>
             {pending && <Loader2 className="animate-spin" />}
             Create account
@@ -131,7 +159,7 @@ export function RegisterForm() {
           </Link>
         </p>
         <p className="text-xs text-muted-foreground/70">
-          UI only — auth backend arrives in Phase 5.
+          Connected to <code className="font-mono text-xs">/api/v1/auth</code>
         </p>
       </CardFooter>
     </Card>

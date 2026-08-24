@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -15,16 +16,34 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { apiFetch, setToken } from "@/lib/api";
 
 export function LoginForm() {
   const [pending, setPending] = React.useState(false);
   const [showPassword, setShowPassword] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const router = useRouter();
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPending(true);
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    setPending(false);
+    setError(null);
+    const fd = new FormData(event.currentTarget as HTMLFormElement);
+    const email = String(fd.get("email") || "").trim();
+    const password = String(fd.get("password") || "");
+    try {
+      const res = await apiFetch<{ access_token: string; refresh_token: string }>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
+      setToken(res.access_token);
+      if (res.refresh_token) localStorage.setItem("nexora_refresh", res.refresh_token);
+      router.push("/workflows");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Login failed");
+    } finally {
+      setPending(false);
+    }
   }
 
   return (
@@ -39,6 +58,7 @@ export function LoginForm() {
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
+              name="email"
               type="email"
               placeholder="you@example.com"
               autoComplete="email"
@@ -50,6 +70,7 @@ export function LoginForm() {
             <div className="relative">
               <Input
                 id="password"
+                name="password"
                 type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 autoComplete="current-password"
@@ -71,6 +92,7 @@ export function LoginForm() {
               </button>
             </div>
           </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
           <Button type="submit" disabled={pending}>
             {pending && <Loader2 className="animate-spin" />}
             Sign in
@@ -88,7 +110,7 @@ export function LoginForm() {
           </Link>
         </p>
         <p className="text-xs text-muted-foreground/70">
-          UI only — auth backend arrives in Phase 5.
+          Connected to <code className="font-mono text-xs">/api/v1/auth/login</code>
         </p>
       </CardFooter>
     </Card>
