@@ -3,27 +3,18 @@
 # Then set the secrets below in Render dashboard > Environment.
 
 services:
-  # --- Postgres with pgvector (Docker private service) ---
-  - type: pserv
+  # --- Postgres with pgvector (managed) — if pgvector missing, fallback to Docker pserv ---
+  - type: psql
     name: nexora-postgres
-    env: docker
-    dockerfilePath: ./infrastructure/docker/postgres/Dockerfile
-    dockerContext: ./infrastructure/docker/postgres
     plan: starter
-    healthCheckPath: /
-    envVars:
-      - key: POSTGRES_USER
-        value: nexora
-      - key: POSTGRES_PASSWORD
-        generateValue: true
-      - key: POSTGRES_DB
-        value: nexora
+    ipAllowList: []
 
   # --- Redis ---
   - type: redis
     name: nexora-redis
     plan: starter
     maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
 
   # --- Core API (FastAPI, runs alembic + uvicorn) ---
   - type: web
@@ -38,9 +29,8 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: DATABASE_URL
-        fromService:
+        fromDatabase:
           name: nexora-postgres
-          type: pserv
           property: connectionString
       - key: REDIS_URL
         fromService:
@@ -74,9 +64,8 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: DATABASE_URL
-        fromService:
+        fromDatabase:
           name: nexora-postgres
-          type: pserv
           property: connectionString
       - key: REDIS_URL
         fromService:
