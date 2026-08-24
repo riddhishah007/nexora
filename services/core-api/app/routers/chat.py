@@ -21,6 +21,7 @@ from app.models.workflow import (
     WorkflowStep,
 )
 from app.orchestrator import Planner, execute_workflow, workflow_name
+from app.orchestrator.executor import synthesize_final_answer
 
 router = APIRouter(tags=["chat"])
 
@@ -126,10 +127,20 @@ async def chat(
     ok = await execute_workflow(db, step_rows, current_user.id)
     workflow.status = STATUS_DONE if ok else STATUS_FAILED
 
-    final_answer = next(
-        (s.output.get("answer") for s in reversed(step_rows) if s.output and "answer" in s.output),
-        "Plan executed.",
-    )
+    # Phase 14 synthesis: combine parallel branch outputs when >1 successful step.
+    synth_text, synth_llm = await synthesize_final_answer(step_rows, str(current_user.id))
+    if synth_llm is not None:
+        try:
+            await LLMGateway.record_usage(db, current_user.id, synth_llm)
+        except Exception:
+            pass
+        final_answer = synth_text
+    else:
+        # single-step or no synthesis needed
+        final_answer = synth_text if synth_text else next(
+            (s.output.get("answer") for s in reversed(step_rows) if s.output and "answer" in s.output),
+            "Plan executed.",
+        )
     db.add(
         Message(
             conversation_id=conversation.id,

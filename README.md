@@ -12,7 +12,7 @@ Full architecture, security model, and roadmap: see
 [`docs/architecture/PROJECT_BLUEPRINT_V1.md`](./docs/architecture/PROJECT_BLUEPRINT_V1.md).
 
 ## Status
-🚧 **Phase 13 — Coding Agent + sandbox complete.** `execute_code` tool (`code:execute`, HIGH trust §27, ephemeral `/tmp/nexora_sbx_*`, 10s timeout, 50 kB caps, audit to `tool_calls`) + `coding-agent` (`generate`/`run` via flash tier) are live at `POST /api/v1/code/{generate,execute,run}` and `POST /api/v1/agents/run` (generic dispatch now supports `search|rag|pdf|coding`). `GET /api/v1/agents` shows 4 agents, `GET /api/v1/tools` 6 tools. Verified live: `print('hello')` → `4`, `while True` → timeout 124, `ZeroDivisionError` → stderr, `fib(10)` gen, `sum squares 1..5` → `55`, RAG/search still live. Next: Multi-agent parallel DAG + orchestrator synthesis — Phase 14.
+🚧 **Phase 14 — Parallel DAG + synthesis complete.** Orchestrator now walks the DAG in concurrent batches (`asyncio.gather` + per-step isolated DB sessions) — `search`+`rag` with `depends_on=[]` run together. `GroqProvider` retries `429` (3 attempts, backoff). `chat` synthesizes multi-branch outputs via flash-tier LLM (`[search:1]`, `[rag:1]` citations). Verified live: `POST /api/v1/chat` → 2 parallel steps (`search-agent` + `rag-agent`) both `done`, synthesis combines Python web results + pgvector citations, `429` retry handles bursts; single-step chat still `done`. Next: Real-time agent network (WebSocket + event bus) — Phase 15.
 
 ## Monorepo layout
 

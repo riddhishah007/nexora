@@ -64,24 +64,37 @@ class GroqProvider:
         if response_schema is not None:
             payload["response_format"] = {"type": "json_object"}
 
-        started = time.perf_counter()
-        async with httpx.AsyncClient(
-            timeout=settings.llm_request_timeout_seconds
-        ) as client:
-            response = await asyncio.wait_for(
-                client.post(
-                    f"{self._base_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self._api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json=payload,
-                ),
-                timeout=settings.llm_request_timeout_seconds,
-            )
-        latency_ms = int((time.perf_counter() - started) * 1000)
-
-        response.raise_for_status()
+        # Simple 429 retry with backoff (Phase 14 parallel bursts hit free-tier limits)
+        last_exc: Exception | None = None
+        for attempt in range(3):
+            started = time.perf_counter()
+            async with httpx.AsyncClient(
+                timeout=settings.llm_request_timeout_seconds
+            ) as client:
+                response = await asyncio.wait_for(
+                    client.post(
+                        f"{self._base_url}/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {self._api_key}",
+                            "Content-Type": "application/json",
+                        },
+                        json=payload,
+                    ),
+                    timeout=settings.llm_request_timeout_seconds,
+                )
+            latency_ms = int((time.perf_counter() - started) * 1000)
+            if response.status_code == 429 and attempt < 2:
+                # respect Retry-After if present, else exponential backoff 1s, 2s
+                retry_after = response.headers.get("retry-after")
+                try:
+                    wait = float(retry_after) if retry_after else (1.0 * (attempt + 1))
+                except ValueError:
+                    wait = 1.0 * (attempt + 1)
+                await asyncio.sleep(min(wait, 5.0))
+                last_exc = None
+                continue
+            response.raise_for_status()
+            break
         data = response.json()
 
         usage = data.get("usage", {})
