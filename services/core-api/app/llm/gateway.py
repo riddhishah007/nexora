@@ -25,6 +25,8 @@ class Provider(Protocol):
         max_output_tokens: int | None = None,
     ) -> LLMResponse: ...
 
+    async def embed(self, texts: list[str], model: str) -> list[list[float]]: ...
+
 
 def _cache_key(prompt: str, model: str, system: str | None) -> str:
     digest = hashlib.sha256(
@@ -124,6 +126,10 @@ class LLMGateway:
         if cache is not None:
             await self._cache_set(cache, response)
         return response
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        model = settings.llm_embedding_model
+        return await self._provider.embed(texts, model=model)
 
     @staticmethod
     async def record_usage(

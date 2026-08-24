@@ -192,6 +192,7 @@ def build_registry() -> ToolRegistry:
     from app.tools.extract_text import ExtractTextTool
     from app.tools.fetch_page import FetchPageTool
     from app.tools.parse_pdf import ParsePdfTool
+    from app.tools.search_documents import SearchDocumentsTool
     from app.tools.search_web import SearchWebTool
 
     registry = ToolRegistry()
@@ -199,6 +200,7 @@ def build_registry() -> ToolRegistry:
     registry.register(FetchPageTool())
     registry.register(ParsePdfTool())
     registry.register(ExtractTextTool())
+    registry.register(SearchDocumentsTool())
     return registry
 
 

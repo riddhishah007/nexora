@@ -28,6 +28,21 @@ class GroqProvider:
             base_url or settings.groq_base_url
         ).rstrip("/")
 
+    async def embed(self, texts: list[str], model: str) -> list[list[float]]:
+        # Groq has no embedding endpoint — use a deterministic local hash
+        # so RAG still works when LLM_PROVIDER=groq (blueprint §10). The
+        # same algorithm is used by MockProvider; real embeddings come from
+        # Gemini when that provider is selected.
+        import hashlib as _hashlib
+
+        out: list[list[float]] = []
+        for text in texts:
+            digest = _hashlib.sha256(text.encode("utf-8")).digest()
+            vec = [((digest[i % len(digest)] - 128) / 128.0) for i in range(768)]
+            norm = sum(x * x for x in vec) ** 0.5 or 1.0
+            out.append([x / norm for x in vec])
+        return out
+
     async def generate(
         self,
         prompt: str,

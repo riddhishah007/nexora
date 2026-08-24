@@ -14,6 +14,7 @@ from app.routers import (
     health,
     llm,
     pdf,
+    rag,
     tools,
     workflows,
 )
@@ -48,6 +49,7 @@ app.include_router(tools.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
 app.include_router(documents.router, prefix="/api/v1")
 app.include_router(pdf.router, prefix="/api/v1")
+app.include_router(rag.router, prefix="/api/v1")
 app.include_router(workflows.router, prefix="/api/v1")
 
 

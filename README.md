@@ -12,13 +12,7 @@ Full architecture, security model, and roadmap: see
 [`docs/architecture/PROJECT_BLUEPRINT_V1.md`](./docs/architecture/PROJECT_BLUEPRINT_V1.md).
 
 ## Status
-🚧 **Phase 11 — PDF Agent complete.** `POST /api/v1/documents` validates
-(§25: PDF-only, 20 MB cap, magic-byte check, randomized storage), two new
-registry tools enforce per-user isolation (`parse_pdf`, `extract_text` —
-`file:read`, only own uploads), and the PDF Agent (`POST /api/v1/pdf/summarize`)
-extracts text with `pypdf` and asks the LLM Gateway (flash tier) for a
-page-cited summary. `agent_id="pdf-agent"` is discoverable at `GET /api/v1/agents`
-and `GET /api/v1/tools`. Next: RAG (pgvector) — Phase 12.
+🚧 **Phase 12 — RAG (pgvector) complete.** `document_chunks` (`pgvector`, 768-d) stores per-user embeddings (§13/§16), chunker `800/120` + batched `LLMGateway.embed()` powers `POST /api/v1/rag/ingest` (idempotent replace, ownership-checked), `search_documents` tool (`knowledge:read`) and `rag-agent` (`POST /api/v1/rag/query` → grounded answer with citations + `distance`) are discoverable at `GET /api/v1/agents` / `GET /api/v1/tools`. Verified live: ingest 6 chunks, query citations, isolation `404`, and `POST /api/v1/pdf/summarize` still live. Next: Coding Agent + sandbox — Phase 13.
 
 ## Monorepo layout
 

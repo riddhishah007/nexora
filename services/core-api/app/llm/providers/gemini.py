@@ -48,3 +48,17 @@ class GeminiProvider:
             tokens_out=getattr(usage, "candidates_token_count", 0) or 0,
             latency_ms=0,
         )
+
+    async def embed(self, texts: list[str], model: str) -> list[list[float]]:
+        vectors: list[list[float]] = []
+        for text in texts:
+            result = await asyncio.wait_for(
+                self._client.aio.models.embed_content(
+                    model=model, contents=text
+                ),
+                timeout=settings.llm_request_timeout_seconds,
+            )
+            # SDK returns .embeddings[0].values
+            emb = result.embeddings[0].values  # type: ignore[attr-defined]
+            vectors.append(list(emb))
+        return vectors

@@ -59,6 +59,11 @@ class Settings(BaseSettings):
     max_upload_size_mb: int = 20
     pdf_extract_max_chars: int = 120_000
 
+    rag_chunk_size: int = 800
+    rag_chunk_overlap: int = 120
+    rag_top_k: int = 5
+    rag_embed_batch: int = 32
+
     @field_validator("database_url", mode="after")
     @classmethod
     def _force_asyncpg_driver(cls, value: str) -> str:

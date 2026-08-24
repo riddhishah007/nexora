@@ -1,3 +1,5 @@
+import hashlib
+
 from app.llm.schemas import LLMResponse, ModelTier
 
 
@@ -32,3 +34,12 @@ class MockProvider:
             latency_ms=0,
             mock=True,
         )
+
+    async def embed(self, texts: list[str], model: str) -> list[list[float]]:
+        out: list[list[float]] = []
+        for text in texts:
+            digest = hashlib.sha256(text.encode("utf-8")).digest()
+            vec = [((digest[i % len(digest)] - 128) / 128.0) for i in range(768)]
+            norm = sum(x * x for x in vec) ** 0.5 or 1.0
+            out.append([x / norm for x in vec])
+        return out
