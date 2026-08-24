@@ -54,14 +54,74 @@ Until you deploy, local links are:
 - In Render, ensure `CORS_ALLOWED_ORIGINS` includes your Vercel URL
 - Redeploy both
 
-## Option B — Fly.io (full Docker Compose)
+## Option B — Fly.io + Supabase (pgvector) + Upstash Redis — **Free permanent (you chose this)**
 
+This is the true free permanent stack (no Render payment). You already have the configs in this repo:
+- `services/core-api/fly.toml` (core-api, `bom` region)
+- `fly.worker.toml` (worker, root context, `services/worker/Dockerfile`)
+- `supabase/enable_pgvector.sql`
+
+### 1. Supabase Postgres (free, has pgvector)
+
+1. Go to https://supabase.com → **New project** (free) → pick region `ap-south-1` (Mumbai) or `ap-southeast-1`
+2. **SQL Editor** → paste `supabase/enable_pgvector.sql`:
+   ```sql
+   CREATE EXTENSION IF NOT EXISTS vector;
+   SELECT * FROM pg_extension WHERE extname='vector';
+   ```
+   → **Run** (should show `vector`)
+3. **Project Settings → Database** → copy **Connection string → URI** (use `postgresql://...` with `?pgbouncer=true` removed for direct, or keep `pooler` for serverless)
+4. This is your `DATABASE_URL` (e.g. `postgresql://postgres.<ref>:<password>@aws-0-ap-south-1.pooler.supabase.com:6543/postgres`)
+
+### 2. Upstash Redis (free)
+
+1. Go to https://upstash.com → **Create Redis** (free) → region `ap-south-1` or `us-east-1`
+2. Copy **Redis URL** (e.g. `redis://default:<password>@<host>:6379`)
+3. This is your `REDIS_URL`
+
+### 3. Fly.io — Core API + Worker (free tier: 3 VMs, needs card but not charged until over)
+
+Install `flyctl` if you don’t have it:
 ```bash
-fly launch --dockerfile services/core-api/Dockerfile --name nexora-core-api
-fly launch --dockerfile services/worker/Dockerfile --name nexora-worker
-# add fly postgres: fly pg create --name nexora-postgres --image-ref pgvector/pgvector:pg16
-# add upstash redis: fly redis create
+# Windows (PowerShell)
+powershell -Command "iwr https://fly.io/install.ps1 -useb | iex"
+# or scoop: scoop install flyctl
+fly auth login
 ```
+
+**Core API:**
+```bash
+# from repo root
+fly launch --config services/core-api/fly.toml --no-deploy
+# fly will ask to create app `nexora-core-api` → yes, region `bom` → no postgres/redis (we use Supabase/Upstash)
+fly secrets set DATABASE_URL="postgresql://..." REDIS_URL="redis://..." GROQ_API_KEY="gsk_..." GEMINI_API_KEY="..." SEARCH_API_KEY="tvly-..." JWT_SECRET="$(openssl rand -hex 32)" REFRESH_TOKEN_SECRET="$(openssl rand -hex 32)" CORS_ALLOWED_ORIGINS="https://nexora.vercel.app" LLM_PROVIDER="groq" --app nexora-core-api
+fly deploy --config services/core-api/fly.toml
+fly status --app nexora-core-api  # wait for health
+fly logs --app nexora-core-api    # should show alembic 0008 + uvicorn
+```
+
+**Worker:**
+```bash
+fly launch --config fly.worker.toml --no-deploy
+# app `nexora-worker`, same region
+fly secrets set DATABASE_URL="postgresql://..." REDIS_URL="redis://..." GROQ_API_KEY="gsk_..." GEMINI_API_KEY="..." --app nexora-worker
+fly deploy --config fly.worker.toml
+fly logs --app nexora-worker  # should show [worker] subscribed to nexora:queue:default
+```
+
+Copy the **core-api URL**: `https://nexora-core-api.fly.dev` (or `fly status` shows `Hostname`)
+
+### 4. Vercel — Frontend (free)
+
+Same as Option A step 2, but set:
+- `NEXT_PUBLIC_API_URL` = `https://nexora-core-api.fly.dev/api/v1` (your Fly URL, not Render)
+
+### Why this is free permanent
+
+- **Supabase:** 500 MB DB, 50k MAU, `pgvector` included — free forever
+- **Upstash:** 10k commands/day, 1 GB — free
+- **Fly.io:** 3 VMs free (`shared-cpu-1x:256MB`), enough for `core-api` + `worker` (2 VMs) — card required but $0 until you exceed
+- **Vercel:** Hobby free — `nexora.vercel.app`
 
 ## Option C — Instant temporary (ngrok)
 

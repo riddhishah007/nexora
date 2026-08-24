@@ -1,0 +1,19 @@
+app = "nexora-core-api"
+primary_region = "bom"  # Mumbai — closest to India, change to iad/sin if you prefer
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8000"
+  ENVIRONMENT = "production"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+# Secrets to set after launch:
+# fly secrets set DATABASE_URL="postgresql://..." REDIS_URL="redis://..." GROQ_API_KEY="gsk_..." SEARCH_API_KEY="tvly-..." JWT_SECRET="$(openssl rand -hex 32)" REFRESH_TOKEN_SECRET="$(openssl rand -hex 32)" CORS_ALLOWED_ORIGINS="https://nexora.vercel.app" LLM_PROVIDER="groq" --app nexora-core-api

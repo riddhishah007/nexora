@@ -1,0 +1,11 @@
+app = "nexora-worker"
+primary_region = "bom"
+
+[build]
+  dockerfile = "services/worker/Dockerfile"
+
+[env]
+  ENVIRONMENT = "production"
+
+# No http_service — background worker
+# Secrets: fly secrets set DATABASE_URL="..." REDIS_URL="..." GROQ_API_KEY="..." --app nexora-worker
