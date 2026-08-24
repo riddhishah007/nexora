@@ -12,7 +12,7 @@ Full architecture, security model, and roadmap: see
 [`docs/architecture/PROJECT_BLUEPRINT_V1.md`](./docs/architecture/PROJECT_BLUEPRINT_V1.md).
 
 ## Status
-🚧 **Phase 15 — Real-time agent network complete.** Redis pub/sub bus (`nexora:workflow:{id}`) + `WebSocket /api/v1/ws/workflows/{id}?token=...` (JWT via `?token` or `Authorization`, workflow ownership check, `CONNECTED` snapshot + live `AGENT_SELECTED/STARTED/COMPLETED/FAILED`, `WORKFLOW_STARTED/COMPLETED`, `FINAL_RESPONSE_READY`; polling fallback when Redis unavailable). Executor and `chat` now `emit` every transition (isolated sessions, best-effort). Verified live: `chat` → 2 parallel steps (`search+rag`) both `done` + synthesis, WS receives `CONNECTED` + manual `PUBLISH AGENT_STARTED` → live `recv`, single-step still `done`. Next: Background workers / queue — Phase 16.
+🚧 **Phase 16 — Worker/queue complete.** `jobs` table + Redis `nexora:queue:default` (LPUSH/BRPOP, idempotent `rag_ingest:{user}:{doc}`, retries 3, dead-letter, `GET /api/v1/jobs/{id}` poll). `POST /api/v1/rag/ingest` now async (enqueue → `queued` → worker) with `?sync=true` fallback; `GET /api/v1/jobs` + `/queue/length`. Worker `services/worker` (shares `pgvector` image, `/app/storage` volume) consumes via `BRPOP` + DB poll fallback, processes `rag_ingest` via `ingest_document` + `pgvector`, emits WS events. Verified live: upload → async `queued` → WS `running` (1 s) → `done` (6 s, `chunks:1`), `sync` still `chunks:1`, `rag/query` citations, queue `0`. Next: Security layer (injection defense, audit log) — Phase 17.
 
 ## Monorepo layout
 

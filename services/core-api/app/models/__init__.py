@@ -3,6 +3,7 @@ from app.models.base import Base
 from app.models.conversation import Conversation, Message
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
+from app.models.job import Job
 from app.models.organization import Organization
 from app.models.tool_call import ToolCall
 from app.models.user import User, UserSession
@@ -14,6 +15,7 @@ __all__ = [
     "Conversation",
     "Document",
     "DocumentChunk",
+    "Job",
     "Message",
     "Organization",
     "ToolCall",

@@ -1,10 +1,11 @@
-"""Phase 12 — RAG endpoints (§13, §16 isolation).
+"""Phase 12 — RAG endpoints (§13, §16 isolation) + Phase 16 queue.
 
-POST /api/v1/rag/ingest  — chunk + embed one of the caller's PDFs
+POST /api/v1/rag/ingest  — async enqueue (default) or sync with ?sync=true
+GET  /api/v1/rag/jobs/{job_id} — poll background ingest job
 POST /api/v1/rag/query   — grounded Q&A over ingested chunks
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,8 +15,10 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.llm import get_llm_gateway
 from app.llm.gateway import LLMGateway
+from app.models.job import JOB_TYPE_RAG_INGEST, Job
 from app.models.user import User
 from app.rag.service import ingest_document
+from app.queue.bus import enqueue
 
 router = APIRouter(prefix="/rag", tags=["rag"])
 
@@ -29,6 +32,13 @@ class RagIngestResponse(BaseModel):
     chunks: int
     chars: int
     page_count: int | None
+
+
+class RagIngestJobResponse(BaseModel):
+    job_id: str
+    document_id: str
+    status: str
+    idempotency_key: str | None = None
 
 
 class RagQueryRequest(BaseModel):
@@ -55,31 +65,78 @@ class RagQueryResponse(BaseModel):
     mock: bool
 
 
-@router.post("/ingest", response_model=RagIngestResponse)
+@router.post("/ingest", response_model=RagIngestJobResponse | RagIngestResponse)
 async def rag_ingest(
     payload: RagIngestRequest,
+    sync: bool = Query(default=False, description="If true, run ingest synchronously (no queue)"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> RagIngestResponse:
-    gateway = get_llm_gateway()
-    # Use configured batch size — pass through here for observability
+):
+    # Ownership check early (404 if not yours)
+    from sqlalchemy import select as _select
+    from app.models.document import Document as _Doc
+    import uuid as _uuid
 
     try:
-        result = await ingest_document(
-            document_id=payload.document_id,
-            db=db,
-            gateway=gateway,
-            user_id=str(current_user.id),
-        )
-    except ValueError as exc:
-        msg = str(exc)
-        if "not found" in msg.lower() or "missing" in msg.lower() or "invalid" in msg.lower():
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=msg) from None
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg) from None
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)[:300]) from exc
+        doc_uuid = _uuid.UUID(payload.document_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found") from None
+    doc = await db.get(_Doc, doc_uuid)
+    if doc is None or str(doc.user_id) != str(current_user.id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
-    return RagIngestResponse(**result)
+    if sync:
+        gateway = get_llm_gateway()
+        try:
+            result = await ingest_document(
+                document_id=payload.document_id, db=db, gateway=gateway, user_id=str(current_user.id)
+            )
+        except ValueError as exc:
+            msg = str(exc)
+            if "not found" in msg.lower() or "missing" in msg.lower() or "invalid" in msg.lower():
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=msg) from None
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg) from None
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)[:300]) from exc
+        return RagIngestResponse(**result)
+
+    # async: enqueue for worker (§18)
+    idem = f"rag_ingest:{current_user.id}:{payload.document_id}"
+    job = await enqueue(
+        db, current_user.id, JOB_TYPE_RAG_INGEST,
+        payload={"document_id": payload.document_id},
+        idempotency_key=idem,
+    )
+    return RagIngestJobResponse(job_id=str(job.id), document_id=payload.document_id, status=job.status, idempotency_key=idem)
+
+
+@router.get("/jobs/{job_id}")
+async def rag_job_status(
+    job_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    import uuid as _uuid
+    from sqlalchemy import select as _select
+
+    try:
+        jid = _uuid.UUID(job_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found") from None
+    job = await db.get(Job, jid)
+    if job is None or str(job.user_id) != str(current_user.id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    return {
+        "job_id": str(job.id),
+        "type": job.type,
+        "status": job.status,
+        "payload": job.payload,
+        "result": job.result,
+        "error": job.error,
+        "attempts": job.attempts,
+        "created_at": job.created_at.isoformat() if job.created_at else None,
+        "updated_at": job.updated_at.isoformat() if job.updated_at else None,
+    }
 
 
 @router.post("/query", response_model=RagQueryResponse)
