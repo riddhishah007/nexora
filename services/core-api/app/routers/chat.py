@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -68,9 +68,47 @@ class ConversationDetail(ConversationSummary):
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
     payload: ChatRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ChatResponse:
+    # Phase 17: prompt-injection scan before any agent sees the input
+    from app.security.events import log_security_event
+    from app.security.injection import scan as injection_scan
+
+    scan = injection_scan(payload.message)
+    if scan["should_block"]:
+        try:
+            await log_security_event(
+                db,
+                event_type="prompt_injection",
+                risk_level=scan["risk_level"],
+                blocked=True,
+                user_id=current_user.id,
+                details={"score": scan["score"], "matched": scan["matched"], "message_preview": payload.message[:300]},
+                ip_address=request.client.host if request.client else None,
+            )
+        except Exception:
+            pass
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Blocked: potential prompt injection detected (risk={scan['risk_level']}, score={scan['score']}) — matched: {', '.join(scan['matched'][:3])}",
+        )
+    elif scan["score"] > 0:
+        # log medium/low risk but allow
+        try:
+            await log_security_event(
+                db,
+                event_type="prompt_injection",
+                risk_level=scan["risk_level"],
+                blocked=False,
+                user_id=current_user.id,
+                details={"score": scan["score"], "matched": scan["matched"]},
+                ip_address=request.client.host if request.client else None,
+            )
+        except Exception:
+            pass
+
     if payload.conversation_id:
         result = await db.execute(
             select(Conversation).where(

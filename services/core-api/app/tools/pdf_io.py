@@ -30,6 +30,21 @@ async def load_owned_document(
     # Isolation boundary (§16): a document owned by anyone else is
     # indistinguishable from one that does not exist.
     if doc is None or str(doc.user_id) != ctx.user_id:
+        # Phase 17: log potential isolation probe (exists but wrong owner)
+        if doc is not None and db is not None:
+            try:
+                from app.security.events import log_security_event
+
+                await log_security_event(
+                    db,
+                    event_type="data_isolation_violation",
+                    risk_level="high",
+                    blocked=True,
+                    user_id=ctx.user_id,
+                    details={"document_id": document_id, "owner": str(doc.user_id)},
+                )
+            except Exception:
+                pass
         raise ToolError("document not found")
 
     path = Path(settings.file_storage_path) / doc.stored_name

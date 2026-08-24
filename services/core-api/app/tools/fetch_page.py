@@ -5,9 +5,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.security.url_guard import is_url_allowed
 from app.tools.base import ToolContext, ToolDefinition, ToolExecutionError
-
-_BLOCKED_HOSTNAMES = {"localhost", "metadata.google.internal", "169.254.169.254"}
 
 
 def _is_public_ip(ip: str) -> bool:
@@ -71,9 +70,45 @@ class FetchPageTool:
         FetchPageInput.model_validate(payload)
         url = payload["url"]
 
+        # Phase 17: SSRF guard — string + private-range check (§25)
+        allowed, reason = is_url_allowed(url)
+        if not allowed:
+            # log blocked SSRF attempt (§26)
+            if db is not None and ctx.user_id:
+                try:
+                    from app.security.events import log_security_event
+
+                    await log_security_event(
+                        db,
+                        event_type="url_blocked",
+                        risk_level="high",
+                        blocked=True,
+                        user_id=ctx.user_id,
+                        agent_id=ctx.agent_id,
+                        details={"url": url[:500], "reason": reason},
+                    )
+                except Exception:
+                    pass
+            raise ToolExecutionError(f"blocked non-public host '{self._hostname(url)}': {reason}")
+
         host = self._hostname(url)
-        if host in _BLOCKED_HOSTNAMES or not await self._host_is_public(host):
-            raise ToolExecutionError(f"blocked non-public host '{host}'")
+        if not await self._host_is_public(host):
+            if db is not None and ctx.user_id:
+                try:
+                    from app.security.events import log_security_event
+
+                    await log_security_event(
+                        db,
+                        event_type="ssrf_blocked",
+                        risk_level="high",
+                        blocked=True,
+                        user_id=ctx.user_id,
+                        agent_id=ctx.agent_id,
+                        details={"url": url[:500], "host": host, "reason": "DNS resolves to private IP"},
+                    )
+                except Exception:
+                    pass
+            raise ToolExecutionError(f"blocked non-public host '{host}' (DNS resolves to private IP)")
 
         async with httpx.AsyncClient(
             timeout=self.definition.timeout_seconds,

@@ -105,6 +105,21 @@ async def login(
         or not user.is_active
         or not verify_password(payload.password, user.password_hash)
     ):
+        # Phase 17: log failed login (§26)
+        try:
+            from app.security.events import log_security_event
+
+            await log_security_event(
+                db,
+                event_type="failed_login",
+                risk_level="medium",
+                blocked=True,
+                user_id=user.id if user else None,
+                details={"email": payload.email.lower()[:120], "reason": "bad credentials or inactive"},
+                ip_address=request.client.host if request.client else None,
+            )
+        except Exception:
+            pass
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",

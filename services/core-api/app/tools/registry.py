@@ -92,6 +92,22 @@ class ToolRegistry:
                 input_payload=payload,
                 error="permission denied", duration_ms=elapsed_ms(),
             )
+            # Phase 17: log permission violation to Security Center
+            if db is not None and ctx.user_id:
+                try:
+                    from app.security.events import log_security_event
+
+                    await log_security_event(
+                        db,
+                        event_type="permission_denied",
+                        risk_level="high",
+                        blocked=True,
+                        user_id=ctx.user_id,
+                        agent_id=ctx.agent_id,
+                        details={"tool_id": tool_id, "required": tool.definition.required_permission, "had": ctx.permissions},
+                    )
+                except Exception:
+                    pass
             raise PermissionDeniedError(
                 f"agent '{ctx.agent_id}' lacks permission "
                 f"'{tool.definition.required_permission}' for tool '{tool_id}'"
@@ -185,7 +201,26 @@ class ToolRegistry:
             db.add(row)
             await db.commit()
         except Exception as exc:  # noqa: BLE001 — audit is best-effort here
+            # FK violation (fake user) -> retry with NULL
+            if "violates foreign key" in str(exc).lower() and row.user_id is not None:
+                try:
+                    await db.rollback()
+                    row.user_id = None
+                    db.add(row)
+                    await db.commit()
+                    return
+                except Exception as e2:  # noqa: BLE001
+                    print(f"[tools] audit retry failed: {type(e2).__name__}: {e2}")
+                    try:
+                        await db.rollback()
+                    except Exception:
+                        pass
+                    return
             print(f"[tools] audit write failed: {type(exc).__name__}: {exc}")
+            try:
+                await db.rollback()
+            except Exception:
+                pass
 
 
 def build_registry() -> ToolRegistry:
