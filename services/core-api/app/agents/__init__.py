@@ -1,3 +1,4 @@
+from app.agents.coding_agent import CodingAgent
 from app.agents.pdf_agent import PdfAgent
 from app.agents.rag_agent import RagAgent
 from app.agents.search_agent import SearchAgent
@@ -12,11 +13,13 @@ _tools = get_tool_registry()
 search_agent = SearchAgent(gateway=_gateway, registry=_tools)
 pdf_agent = PdfAgent(gateway=_gateway, registry=_tools)
 rag_agent = RagAgent(gateway=_gateway, registry=_tools)
+coding_agent = CodingAgent(gateway=_gateway, registry=_tools)
 
 AGENT_REGISTRY: dict[str, object] = {
     SearchAgent.agent_id: search_agent,
     PdfAgent.agent_id: pdf_agent,
     RagAgent.agent_id: rag_agent,
+    CodingAgent.agent_id: coding_agent,
 }
 
 REGISTRY_INFO: list[AgentInfo] = [
@@ -58,5 +61,18 @@ REGISTRY_INFO: list[AgentInfo] = [
         model=_gateway.model_for_tier("flash"),
         status="active",
         cost_profile="low",
+    ),
+    AgentInfo(
+        agent_id="coding-agent",
+        name="Coding Agent",
+        version="1.0.0",
+        description="Generates Python code and runs it in a sandboxed, ephemeral directory (no network, timeout + output caps).",
+        capabilities=["code_generation", "code_execution", "error_explanation"],
+        supported_tasks=["code_generate", "code_run", "debug"],
+        tools=["execute_code"],
+        permissions=["code:execute"],
+        model=_gateway.model_for_tier("flash"),
+        status="active",
+        cost_profile="medium",
     ),
 ]

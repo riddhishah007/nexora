@@ -12,7 +12,7 @@ Full architecture, security model, and roadmap: see
 [`docs/architecture/PROJECT_BLUEPRINT_V1.md`](./docs/architecture/PROJECT_BLUEPRINT_V1.md).
 
 ## Status
-🚧 **Phase 12 — RAG (pgvector) complete.** `document_chunks` (`pgvector`, 768-d) stores per-user embeddings (§13/§16), chunker `800/120` + batched `LLMGateway.embed()` powers `POST /api/v1/rag/ingest` (idempotent replace, ownership-checked), `search_documents` tool (`knowledge:read`) and `rag-agent` (`POST /api/v1/rag/query` → grounded answer with citations + `distance`) are discoverable at `GET /api/v1/agents` / `GET /api/v1/tools`. Verified live: ingest 6 chunks, query citations, isolation `404`, and `POST /api/v1/pdf/summarize` still live. Next: Coding Agent + sandbox — Phase 13.
+🚧 **Phase 13 — Coding Agent + sandbox complete.** `execute_code` tool (`code:execute`, HIGH trust §27, ephemeral `/tmp/nexora_sbx_*`, 10s timeout, 50 kB caps, audit to `tool_calls`) + `coding-agent` (`generate`/`run` via flash tier) are live at `POST /api/v1/code/{generate,execute,run}` and `POST /api/v1/agents/run` (generic dispatch now supports `search|rag|pdf|coding`). `GET /api/v1/agents` shows 4 agents, `GET /api/v1/tools` 6 tools. Verified live: `print('hello')` → `4`, `while True` → timeout 124, `ZeroDivisionError` → stderr, `fib(10)` gen, `sum squares 1..5` → `55`, RAG/search still live. Next: Multi-agent parallel DAG + orchestrator synthesis — Phase 14.
 
 ## Monorepo layout
 

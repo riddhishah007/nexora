@@ -10,6 +10,7 @@ from app.routers import (
     agents,
     auth,
     chat,
+    code,
     documents,
     health,
     llm,
@@ -50,6 +51,7 @@ app.include_router(chat.router, prefix="/api/v1")
 app.include_router(documents.router, prefix="/api/v1")
 app.include_router(pdf.router, prefix="/api/v1")
 app.include_router(rag.router, prefix="/api/v1")
+app.include_router(code.router, prefix="/api/v1")
 app.include_router(workflows.router, prefix="/api/v1")
 
 

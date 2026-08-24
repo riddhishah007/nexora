@@ -189,6 +189,7 @@ class ToolRegistry:
 
 
 def build_registry() -> ToolRegistry:
+    from app.tools.execute_code import ExecuteCodeTool
     from app.tools.extract_text import ExtractTextTool
     from app.tools.fetch_page import FetchPageTool
     from app.tools.parse_pdf import ParsePdfTool
@@ -201,6 +202,7 @@ def build_registry() -> ToolRegistry:
     registry.register(ParsePdfTool())
     registry.register(ExtractTextTool())
     registry.register(SearchDocumentsTool())
+    registry.register(ExecuteCodeTool())
     return registry
 
 

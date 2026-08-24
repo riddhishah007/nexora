@@ -29,14 +29,17 @@ class AgentInfo(BaseModel):
 
 class AgentRunRequest(BaseModel):
     agent_id: str = Field(pattern="^[a-z0-9-]+$")
-    input: SearchAgentInput
+    input: dict | SearchAgentInput = Field(default_factory=dict)
 
 
 class AgentRunResponse(BaseModel):
     agent_id: str
     answer: str
-    sources: list[Source]
+    sources: list[Source] = Field(default_factory=list)
     provider: str
     model: str
     latency_ms: int
     mock: bool
+    # coding-agent extra (optional, not breaking search/rag callers)
+    execution: dict | None = None
+    citations: list[dict] | None = None

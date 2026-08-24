@@ -64,6 +64,11 @@ class Settings(BaseSettings):
     rag_top_k: int = 5
     rag_embed_batch: int = 32
 
+    sandbox_path: str = "/tmp/nexora_sandbox"
+    code_execution_timeout_seconds: float = 10.0
+    code_execution_max_output_bytes: int = 50_000
+    code_execution_max_code_bytes: int = 30_000
+
     @field_validator("database_url", mode="after")
     @classmethod
     def _force_asyncpg_driver(cls, value: str) -> str:
