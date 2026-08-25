@@ -12,7 +12,9 @@ Full architecture, security model, and roadmap: see
 [`docs/architecture/PROJECT_BLUEPRINT_V1.md`](./docs/architecture/PROJECT_BLUEPRINT_V1.md).
 
 ## Status
-🚧 **Phase 23 — Usage/metrics dashboard.** New `GET /api/v1/usage/summary?days=N` (1–90, per-user scoped): totals (calls, cached, tokens in/out, avg latency), per-model breakdown (`GROUP BY provider,model`), and per-day buckets (`func.date(created_at)`) — all over the `api_usage` table that was already being written at ~20 call sites but never surfaced. `/dashboard` page renders it: stat cards (requests/tokens/latency/cache-hit-rate), pure-CSS daily bar chart with hover tooltips, per-model table, 7/14/30-day range switcher; linked from the chat sidebar ("Usage"). Verified E2E against real accumulated usage data (2 calls, qwen model row, day bucket correct); `tsc`/build clean; containers rebuilt.
+🚧 **Phase 24 — Test suite.** First tests ever in the repo: 40 passing (`pytest` + `pytest-asyncio`, `requirements-dev.txt`, `pytest.ini`). Unit: injection scanner scoring/blocking matrix, planner `_parse` validation (unknown agents, forward deps, size caps, malformed JSON) + `build_plan` fallbacks via fake gateway (provider failure → single-step search plan), Groq `<think>` strip variants, filename sanitization + upload allowlists. Integration (auto-skips when stack is down): health, auth roundtrip, registry completeness (7 agents), templates shape, workflow CRUD + dependency validation, usage summary shape + per-user isolation, auth boundaries (public catalog vs private data). Run: `docker exec -w /app nexora-core-api python -m pytest tests/ -v`. Deferred: RAG golden-set evals (meaningful only with real embeddings), LLM-marked live-call tests.
+
+**Phase 23 — Usage/metrics dashboard.** New `GET /api/v1/usage/summary?days=N` (1–90, per-user scoped): totals (calls, cached, tokens in/out, avg latency), per-model breakdown (`GROUP BY provider,model`), and per-day buckets (`func.date(created_at)`) — all over the `api_usage` table that was already being written at ~20 call sites but never surfaced. `/dashboard` page renders it: stat cards (requests/tokens/latency/cache-hit-rate), pure-CSS daily bar chart with hover tooltips, per-model table, 7/14/30-day range switcher; linked from the chat sidebar ("Usage"). Verified E2E against real accumulated usage data (2 calls, qwen model row, day bucket correct); `tsc`/build clean; containers rebuilt.
 
 **Phase 22 — Live streaming chat.** `/chat` no longer blocks: new `POST /chat/start` returns the plan (conversation_id, workflow_id, seed steps) in seconds while execution runs as a background task (`_execute_chat_workflow` in `routers/chat.py`: own `SessionFactory` session, never raises, always emits `FINAL_RESPONSE_READY`, persists an assistant message even on failure). The chat UI subscribes to the existing `WS /ws/workflows/{id}` stream: pending bubble shows live agent chips (spinner → check/cross per step), "Agents working…" while connected, plus a 4s polling fallback if the WS is unavailable — on completion it swaps in the persisted answer. Shared prep logic extracted (`_prepare_chat`/`_finalize_chat`/`_chat_response`); legacy blocking `POST /chat` kept working on the same code path. Verified E2E: `/chat/start` returned plan in **2.9s**, WS streamed `AGENT_COMPLETED(0)` + `FINAL_RESPONSE_READY`, assistant answer persisted ("George Orwell [1]").
 
@@ -50,6 +52,17 @@ docs/architecture/       → Blueprint and architecture docs
    - Core API health check: http://localhost:8000/health → `{"status":"ok",...}`
    - Postgres is up on `localhost:5432` (pgvector extension pre-installed via the `pgvector/pgvector:pg16` image)
    - Redis is up on `localhost:6379`
+
+## Running tests
+
+Backend suite (unit tests run anywhere inside the container; `integration`-marked tests hit the live local stack and auto-skip when it's down):
+
+```bash
+docker exec nexora-core-api pip install -q -r requirements-dev.txt
+docker exec -w /app nexora-core-api python -m pytest tests/ -v
+```
+
+Covered today: injection scanner, planner parsing + provider-failure fallback, Groq `<think>` stripping, upload filename sanitization/allowlists, plus API integration (health, auth roundtrip, agent registry shape, templates, workflow CRUD/validation, usage summary shape + user scoping, auth boundaries).
 
 ## Why these technology choices (short version)
 
