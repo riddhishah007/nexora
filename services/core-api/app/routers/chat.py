@@ -53,6 +53,7 @@ class MessageOut(BaseModel):
     role: str
     content: str
     created_at: str
+    workflow_id: uuid.UUID | None = None
 
 
 class ConversationSummary(BaseModel):
@@ -269,13 +270,14 @@ async def get_conversation(
         id=conversation.id,
         title=conversation.title,
         created_at=conversation.created_at.isoformat(),
-        messages=[
-            MessageOut(
-                id=m.id,
-                role=m.role,
-                content=m.content,
-                created_at=m.created_at.isoformat(),
-            )
-            for m in conversation.messages
-        ],
+            messages=[
+                MessageOut(
+                    id=m.id,
+                    role=m.role,
+                    content=m.content,
+                    created_at=m.created_at.isoformat(),
+                    workflow_id=m.workflow_id,
+                )
+                for m in conversation.messages
+            ],
     )

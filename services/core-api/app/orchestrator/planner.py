@@ -68,12 +68,22 @@ class Planner:
         prompt = (
             f"Available agents:\n{catalog}\n\nUser request: {message}"
         )
-        llm = await self._gateway.generate(
-            prompt=prompt,
-            tier=ModelTier.FLASH,
-            system=PLANNER_SYSTEM,
-            response_schema=PLAN_SCHEMA,
-        )
+        try:
+            llm = await self._gateway.generate(
+                prompt=prompt,
+                tier=ModelTier.FLASH,
+                system=PLANNER_SYSTEM,
+                response_schema=PLAN_SCHEMA,
+            )
+        except Exception:
+            # Provider outage/transient 4xx/5xx must not kill /chat — fall back
+            # to a valid single-step plan so the pipeline never dead-ends.
+            from app.llm.schemas import LLMResponse
+
+            return (
+                [PlannedStep(agent_id="search-agent", instruction=message, depends_on=[])],
+                LLMResponse(text="", provider="none", model="n/a", tokens_in=0, tokens_out=0, latency_ms=0, mock=True),
+            )
         try:
             return self._parse(llm.text), llm
         except (ValueError, KeyError, TypeError):

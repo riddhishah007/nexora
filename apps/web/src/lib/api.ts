@@ -83,3 +83,35 @@ export type Template = {
   description: string;
   steps: { agent_id: string; instruction: string; depends_on: number[] }[];
 };
+
+// --- chat workspace ---
+export type ConversationSummary = {
+  id: string;
+  title: string;
+  created_at: string;
+};
+
+export type ChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+  workflow_id?: string | null;
+};
+
+export type ConversationDetail = ConversationSummary & {
+  messages: ChatMessage[];
+};
+
+export type ChatResponse = {
+  conversation_id: string;
+  workflow_id: string;
+  status: string;
+  steps: {
+    seq: number;
+    agent_id: string;
+    instruction: string;
+    depends_on: number[];
+    status: string;
+  }[];
+};
