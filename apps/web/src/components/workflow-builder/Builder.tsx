@@ -362,7 +362,7 @@ export function Builder() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col">
+    <div className="flex h-dvh flex-col">
       <header className="flex items-center gap-3 border-b border-border bg-card/50 px-4 py-2">
         <Input value={name} onChange={(e) => setName(e.target.value)} className="max-w-xs" placeholder="Workflow name" />
         <span className="font-mono text-xs text-muted-foreground">{nodes.length} nodes · {edges.length} edges</span>
@@ -391,7 +391,7 @@ export function Builder() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Palette */}
-        <aside className="w-56 border-r border-border bg-card/30 p-3">
+        <aside className="w-56 shrink-0 overflow-y-auto border-r border-border bg-card/30 p-3">
           <p className="mb-2 text-xs font-medium">Agents</p>
           <div className="flex flex-col gap-2">
             {AGENTS.map((a) => (
@@ -440,7 +440,7 @@ export function Builder() {
         </div>
 
         {/* Inspector */}
-        <aside className="w-72 border-l border-border bg-card/30 p-3">
+        <aside className="w-72 shrink-0 overflow-y-auto border-l border-border bg-card/30 p-3">
           <p className="mb-2 text-xs font-medium">Inspector</p>
           {!selectedNode ? (
             <p className="text-xs text-muted-foreground">Select a node to edit its instruction.</p>
