@@ -20,6 +20,7 @@ from app.routers import (
     realtime,
     security,
     tools,
+    usage,
     workflows,
 )
 
@@ -59,6 +60,7 @@ app.include_router(realtime.router, prefix="/api/v1")
 app.include_router(jobs.router, prefix="/api/v1")
 app.include_router(security.router, prefix="/api/v1")
 app.include_router(workflows.router, prefix="/api/v1")
+app.include_router(usage.router, prefix="/api/v1")
 
 
 @app.get("/")

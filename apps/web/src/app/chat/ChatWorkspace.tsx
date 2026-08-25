@@ -135,6 +135,9 @@ export default function ChatPage() {
           <Link href="/workflows" className="text-xs text-muted-foreground hover:text-foreground">
             Workflows
           </Link>
+          <Link href="/dashboard" className="text-xs text-muted-foreground hover:text-foreground">
+            Usage
+          </Link>
         </div>
         <div className="p-3">
           <Button variant="outline" size="sm" className="w-full" onClick={() => router.push("/chat")}>
