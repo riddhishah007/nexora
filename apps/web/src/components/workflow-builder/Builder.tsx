@@ -17,11 +17,13 @@ import {
   Position,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { Check, Loader2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiFetch, getToken, type Workflow } from "@/lib/api";
+import { useWorkflowStream, type StepRunStatus } from "@/lib/useWorkflowStream";
 import { cn } from "@/lib/utils";
 
 type AgentType = "search-agent" | "rag-agent" | "pdf-agent" | "coding-agent" | "research-agent" | "data-agent" | "writer-agent";
@@ -36,22 +38,43 @@ const AGENTS: { id: AgentType; label: string; color: string; desc: string }[] = 
   { id: "writer-agent", label: "Writer", color: "bg-pink-500", desc: "report generation" },
 ];
 
-function AgentNode({ data, selected }: { data: { agent_id: AgentType; instruction: string; label: string }; selected?: boolean }) {
+type AgentNodeData = {
+  agent_id: AgentType;
+  instruction: string;
+  label: string;
+  runStatus?: StepRunStatus;
+};
+
+const RUN_STYLES: Record<Exclude<StepRunStatus, "pending">, { border: string; badge: string }> = {
+  selected: { border: "border-amber-500/60", badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
+  running: { border: "border-primary ring-2 ring-primary/30", badge: "bg-primary/10 text-primary" },
+  done: { border: "border-emerald-500/60 bg-emerald-500/5", badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
+  failed: { border: "border-destructive/70 bg-destructive/5", badge: "bg-destructive/10 text-destructive" },
+};
+
+function AgentNode({ data, selected }: { data: AgentNodeData; selected?: boolean }) {
   const agent = AGENTS.find((a) => a.id === data.agent_id) || AGENTS[0];
+  const st = data.runStatus && data.runStatus !== "pending" ? RUN_STYLES[data.runStatus] : null;
   return (
     <div
       className={cn(
-        "min-w-[180px] rounded-lg border bg-card px-3 py-2 shadow-sm",
-        selected ? "border-primary ring-1 ring-primary/30" : "border-border"
+        "min-w-[180px] rounded-lg border bg-card px-3 py-2 shadow-sm transition-colors",
+        st ? st.border : selected ? "border-primary ring-1 ring-primary/30" : "border-border"
       )}
     >
       <Handle type="target" position={Position.Top} className="!bg-muted-foreground" />
       <div className="flex items-center gap-2">
         <span className={cn("h-2 w-2 rounded-full", agent.color)} />
         <span className="font-mono text-xs font-medium">{data.label || agent.label}</span>
+        {data.runStatus === "running" && <Loader2 className="h-3 w-3 shrink-0 animate-spin text-primary" />}
+        {data.runStatus === "done" && <Check className="h-3 w-3 shrink-0 text-emerald-500" />}
+        {data.runStatus === "failed" && <X className="h-3 w-3 shrink-0 text-destructive" />}
         <span className="ml-auto rounded bg-muted px-1 py-0.5 font-mono text-[10px]">{data.agent_id}</span>
       </div>
       <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{data.instruction || "— no instruction —"}</p>
+      {st && (
+        <span className={cn("mt-1 inline-block rounded px-1 py-0.5 font-mono text-[10px]", st.badge)}>{data.runStatus}</span>
+      )}
       <Handle type="source" position={Position.Bottom} className="!bg-muted-foreground" />
     </div>
   );
@@ -74,6 +97,24 @@ export function Builder() {
   const [message, setMessage] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [result, setResult] = React.useState<Workflow | null>(null);
+  const [runWfId, setRunWfId] = React.useState<string | null>(null);
+  const seqToNodeRef = React.useRef<Record<number, string>>({});
+  const firedForRef = React.useRef<string | null>(null);
+
+  const stream = useWorkflowStream(runWfId, executing);
+
+  // paint live per-step status onto nodes
+  React.useEffect(() => {
+    setNodes((nds) =>
+      nds.map((n) => {
+        const seq = Number(Object.entries(seqToNodeRef.current).find(([, id]) => id === n.id)?.[0]);
+        const st = seq !== undefined && Number.isFinite(seq) ? stream.stepStatus[seq] : undefined;
+        const current = (n.data as AgentNodeData).runStatus;
+        if (st === current) return n;
+        return { ...n, data: { ...n.data, runStatus: st } };
+      })
+    );
+  }, [stream.stepStatus, setNodes]);
 
   const selectedNode = React.useMemo(() => nodes.find((n) => n.id === selectedId), [nodes, selectedId]);
 
@@ -245,25 +286,78 @@ export function Builder() {
     }
   }
 
+  function fireExecute(wfId: string) {
+    apiFetch<Workflow>(`/workflows/${wfId}/execute`, { method: "POST" })
+      .then((res) => {
+        setResult(res);
+        setMessage(`Executed ${wfId.slice(0, 8)}: ${res.status} — ${res.steps.filter((s) => s.status === "done").length}/${res.steps.length} steps done`);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setExecuting(false));
+  }
+
+  // once the live stream is connected, kick off the actual run
+  React.useEffect(() => {
+    if (!stream.connected || !runWfId || firedForRef.current === runWfId) return;
+    firedForRef.current = runWfId;
+    setMessage(`Live — executing workflow ${runWfId.slice(0, 8)}`);
+    fireExecute(runWfId);
+  }, [stream.connected, runWfId]);
+
+  // fallback: if the stream never connects, run anyway after 3s
+  React.useEffect(() => {
+    if (!executing || !runWfId || firedForRef.current === runWfId) return;
+    const t = setTimeout(() => {
+      if (firedForRef.current !== runWfId) {
+        firedForRef.current = runWfId;
+        fireExecute(runWfId);
+      }
+    }, 3000);
+    return () => clearTimeout(t);
+  }, [executing, runWfId]);
+
+  // when the stream signals completion, pull the final persisted result
+  React.useEffect(() => {
+    if (!stream.finalReady || !runWfId) return;
+    apiFetch<Workflow>(`/workflows/${runWfId}`)
+      .then((res) => setResult(res))
+      .catch(() => {});
+  }, [stream.finalReady, runWfId]);
+
   async function onExecute() {
-    // need a saved workflow id
-    let wfId = workflowId;
-    if (!wfId) {
-      // auto-save first
-      await onSave();
+    if (nodes.length === 0) {
+      setError("Add at least one agent node");
       return;
     }
-    setExecuting(true);
+    for (const n of nodes) {
+      if (!(String((n.data as AgentNodeData).instruction || "").trim())) {
+        setError("Every node needs an instruction before running");
+        return;
+      }
+    }
     setError(null);
     setMessage(null);
+    setResult(null);
+    setExecuting(true);
     try {
-      const res = await apiFetch<Workflow>(`/workflows/${wfId}/execute`, { method: "POST" });
-      setResult(res);
-      setMessage(`Executed: ${res.status} — ${res.steps.filter((s) => s.status === "done").length}/${res.steps.length} steps done`);
+      // Run = save a fresh workflow, then stream its execution live.
+      // seq mapping comes from the same topological order used in the payload.
+      const { steps, sorted } = toSteps();
+      const payload = { name, steps, definition: { nodes, edges } };
+      const created = await apiFetch<{ id: string }>("/workflows", { method: "POST", body: JSON.stringify(payload) });
+      const map: Record<number, string> = {};
+      sorted.forEach((n, idx) => {
+        map[idx] = n.id;
+      });
+      seqToNodeRef.current = map;
+      // reset node statuses
+      setNodes((nds) => nds.map((n) => ({ ...n, data: { ...n.data, runStatus: undefined } })));
+      firedForRef.current = null;
+      setRunWfId(created.id);
+      setMessage(`Connecting to live stream… (${created.id.slice(0, 8)})`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
       setExecuting(false);
+      setError(e instanceof Error ? e.message : String(e));
     }
   }
 
@@ -273,13 +367,20 @@ export function Builder() {
         <Input value={name} onChange={(e) => setName(e.target.value)} className="max-w-xs" placeholder="Workflow name" />
         <span className="font-mono text-xs text-muted-foreground">{nodes.length} nodes · {edges.length} edges</span>
         <div className="ml-auto flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={onSave} disabled={saving}>
+          {executing && (
+            <span className="flex items-center gap-1.5 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+              <span className={cn("h-1.5 w-1.5 rounded-full", stream.connected ? "animate-pulse bg-emerald-500" : "bg-muted-foreground")} />
+              {stream.connected ? "LIVE" : "CONNECTING"}
+              {stream.workflowStatus && <span className="font-mono">· {stream.workflowStatus}</span>}
+            </span>
+          )}
+          <Button variant="outline" size="sm" onClick={onSave} disabled={saving || executing}>
             {saving ? "Saving…" : "Save"}
           </Button>
-          <Button size="sm" onClick={onExecute} disabled={executing || !workflowId}>
+          <Button size="sm" onClick={onExecute} disabled={executing}>
             {executing ? "Running…" : "Run"}
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => { setNodes([]); setEdges([]); setResult(null); setMessage(null); setError(null); }}>
+          <Button variant="ghost" size="sm" onClick={() => { setNodes([]); setEdges([]); setResult(null); setMessage(null); setError(null); setExecuting(false); setRunWfId(null); seqToNodeRef.current = {}; firedForRef.current = null; }}>
             Clear
           </Button>
         </div>
@@ -373,6 +474,34 @@ export function Builder() {
                 Remove node
               </Button>
               <p className="font-mono text-xs text-muted-foreground">id: {selectedNode.id}</p>
+            </div>
+          )}
+
+          {(executing || stream.events.length > 0) && (
+            <div className="mt-4">
+              <p className="flex items-center gap-1.5 text-xs font-medium">
+                <span
+                  className={cn(
+                    "h-1.5 w-1.5 rounded-full",
+                    stream.connected ? "animate-pulse bg-emerald-500" : executing ? "bg-amber-500" : "bg-muted-foreground"
+                  )}
+                />
+                Live activity
+                {stream.error && <span className="ml-auto font-mono text-[10px] text-muted-foreground">{stream.error}</span>}
+              </p>
+              <ul className="mt-1 max-h-44 space-y-0.5 overflow-y-auto font-mono text-[10px] text-muted-foreground">
+                {[...stream.events]
+                  .reverse()
+                  .slice(0, 30)
+                  .map((ev, i) => (
+                    <li key={`${i}-${ev.type}`} className="truncate">
+                      <span className="text-primary/70">{ev.type}</span>
+                      {typeof ev.data?.seq === "number" && ` #${ev.data.seq}`}
+                      {typeof ev.data?.agent_id === "string" && ` ${ev.data.agent_id}`}
+                      {typeof ev.data?.status === "string" && ` → ${ev.data.status}`}
+                    </li>
+                  ))}
+              </ul>
             </div>
           )}
 

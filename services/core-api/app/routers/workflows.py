@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.agents import REGISTRY_INFO
 from app.database import get_db
 from app.dependencies import get_current_user
+from app.events.bus import emit
 from app.models.user import User
 from app.models.workflow import (
     STATUS_DONE,
@@ -248,6 +249,8 @@ async def execute_workflow_endpoint(
         pass
 
     await db.commit()
+    # tell live stream subscribers the full result (incl. synthesis) is persisted
+    await emit(str(workflow.id), "FINAL_RESPONSE_READY", {"status": workflow.status})
     # refresh
     steps = (await db.execute(select(WorkflowStep).where(WorkflowStep.workflow_id == workflow.id).order_by(WorkflowStep.seq))).scalars().all()
     return WorkflowOut(
