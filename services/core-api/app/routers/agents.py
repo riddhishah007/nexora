@@ -93,6 +93,35 @@ async def run_agent(
                 provider=llm.provider, model=llm.model, latency_ms=llm.latency_ms, mock=llm.mock,
                 execution=exec_data,
             )
+        elif payload.agent_id == "research-agent":
+            task = raw.get("task") or raw.get("query") or ""
+            answer, results, llm = await agent.run(task, db, user_id=str(current_user.id))
+            await LLMGateway.record_usage(db, current_user.id, llm)
+            return AgentRunResponse(
+                agent_id=payload.agent_id, answer=answer,
+                sources=[Source(title=r.get("title",""), url=r.get("url",""), score=float(r.get("score",0))) for r in results],
+                provider=llm.provider, model=llm.model, latency_ms=llm.latency_ms, mock=llm.mock,
+            )
+        elif payload.agent_id == "data-agent":
+            task = raw.get("task") or raw.get("query") or ""
+            doc_id = raw.get("document_id")
+            answer, meta, llm = await agent.run(task, db, user_id=str(current_user.id), document_id=doc_id)
+            await LLMGateway.record_usage(db, current_user.id, llm)
+            return AgentRunResponse(
+                agent_id=payload.agent_id, answer=answer, sources=[],
+                provider=llm.provider, model=llm.model, latency_ms=llm.latency_ms, mock=llm.mock,
+                execution=meta,
+            )
+        elif payload.agent_id == "writer-agent":
+            task = raw.get("task") or raw.get("query") or ""
+            context = raw.get("context")
+            answer, meta, llm = await agent.run(task, db, user_id=str(current_user.id), context=context)
+            await LLMGateway.record_usage(db, current_user.id, llm)
+            return AgentRunResponse(
+                agent_id=payload.agent_id, answer=answer, sources=[],
+                provider=llm.provider, model=llm.model, latency_ms=llm.latency_ms, mock=llm.mock,
+                execution=meta,
+            )
         else:
             # Fallback: try generic run(task)
             task = raw.get("task") or raw.get("query") or str(raw)

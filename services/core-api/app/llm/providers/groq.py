@@ -8,11 +8,15 @@ import httpx
 from app.config import settings
 from app.llm.schemas import LLMResponse
 
-_THINK_RE = re.compile(r"<think>.*?</think>\s*", flags=re.DOTALL)
-
+_THINK_RE = re.compile(r"<think>.*?</think>\s*", flags=re.DOTALL | re.IGNORECASE)
 
 def _strip_reasoning(text: str) -> str:
-    return _THINK_RE.sub("", text).strip()
+    # Remove closed think blocks
+    text = _THINK_RE.sub("", text)
+    # Remove any remaining think tags (unclosed or stray) but keep content
+    # Qwen sometimes returns <think> without </think> due to truncation — strip the tags only
+    text = re.sub(r"</?think[^>]*>", "", text, flags=re.IGNORECASE)
+    return text.strip()
 
 
 class GroqProvider:
@@ -84,13 +88,13 @@ class GroqProvider:
                 )
             latency_ms = int((time.perf_counter() - started) * 1000)
             if response.status_code == 429 and attempt < 2:
-                # respect Retry-After if present, else exponential backoff 1s, 2s
+                # respect Retry-After if present, else exponential backoff 2s, 4s
                 retry_after = response.headers.get("retry-after")
                 try:
-                    wait = float(retry_after) if retry_after else (1.0 * (attempt + 1))
+                    wait = float(retry_after) if retry_after else (2.0 * (attempt + 1))
                 except ValueError:
-                    wait = 1.0 * (attempt + 1)
-                await asyncio.sleep(min(wait, 5.0))
+                    wait = 2.0 * (attempt + 1)
+                await asyncio.sleep(min(wait, 8.0))
                 last_exc = None
                 continue
             response.raise_for_status()

@@ -146,6 +146,25 @@ async def _run_one_isolated(seq: int, agent_id: str, instruction: str, user_id: 
                 await LLMGateway.record_usage(iso, user_id, llm)  # type: ignore[arg-type]
                 output = {"agent_id": agent_id, "answer": answer, "execution": exec_data, "provider": llm.provider, "model": llm.model}
                 return output, llm, None
+            elif agent_id == "research-agent":
+                answer, results, llm = await agent.run(instruction, db=iso, user_id=user_id)
+                await LLMGateway.record_usage(iso, user_id, llm)  # type: ignore[arg-type]
+                output = {"agent_id": agent_id, "answer": answer, "sources": results, "provider": llm.provider, "model": llm.model}
+                return output, llm, None
+            elif agent_id == "data-agent":
+                # try to extract document_id from instruction if it looks like a UUID
+                import re as _re2
+                m = _re2.search(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", instruction, _re2.I)
+                doc_id = m.group(0) if m else None
+                answer, meta, llm = await agent.run(instruction, db=iso, user_id=user_id, document_id=doc_id)
+                await LLMGateway.record_usage(iso, user_id, llm)  # type: ignore[arg-type]
+                output = {"agent_id": agent_id, "answer": answer, "meta": meta, "provider": llm.provider, "model": llm.model}
+                return output, llm, None
+            elif agent_id == "writer-agent":
+                answer, meta, llm = await agent.run(instruction, db=iso, user_id=user_id)
+                await LLMGateway.record_usage(iso, user_id, llm)  # type: ignore[arg-type]
+                output = {"agent_id": agent_id, "answer": answer, "meta": meta, "provider": llm.provider, "model": llm.model}
+                return output, llm, None
             else:
                 # generic fallback
                 answer, results, llm = await agent.run(instruction, db=iso, user_id=user_id)

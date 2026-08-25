@@ -77,6 +77,35 @@ TEMPLATES = [
             {"agent_id": "coding-agent", "instruction": "Write Python code to solve the task and print the result", "depends_on": []},
         ],
     },
+    {
+        "id": "template-deep-research-report",
+        "name": "Deep Research Report",
+        "description": "Research Agent breaks the question into sub-questions and cross-checks sources; Writer turns it into a cited report.",
+        "steps": [
+            {"agent_id": "research-agent", "instruction": "Research the topic thoroughly with sub-questions and cross-checked sources", "depends_on": []},
+            {"agent_id": "writer-agent", "instruction": "Turn the research findings into a polished markdown report with citations", "depends_on": [0]},
+        ],
+    },
+    {
+        "id": "template-csv-analysis-report",
+        "name": "CSV Analysis Report",
+        "description": "Data Agent analyzes your uploaded CSV in the sandbox; Writer produces an executive summary report.",
+        "steps": [
+            {"agent_id": "data-agent", "instruction": "Analyze the uploaded CSV (replace with your document_id): shape, stats, trends", "depends_on": []},
+            {"agent_id": "writer-agent", "instruction": "Write a data analysis report from the findings with key takeaways", "depends_on": [0]},
+        ],
+    },
+    {
+        "id": "template-multi-source-brief",
+        "name": "Multi-Source Brief",
+        "description": "Web search, RAG, and research run in parallel; Writer merges everything into one brief.",
+        "steps": [
+            {"agent_id": "search-agent", "instruction": "Search the web for current information about the topic", "depends_on": []},
+            {"agent_id": "rag-agent", "instruction": "Retrieve relevant passages from ingested documents about the topic", "depends_on": []},
+            {"agent_id": "research-agent", "instruction": "Cross-check the topic's key claims against independent sources", "depends_on": []},
+            {"agent_id": "writer-agent", "instruction": "Merge all findings into one executive brief with references", "depends_on": [0, 1, 2]},
+        ],
+    },
 ]
 
 

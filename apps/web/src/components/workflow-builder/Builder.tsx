@@ -24,13 +24,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiFetch, getToken, type Workflow } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-type AgentType = "search-agent" | "rag-agent" | "pdf-agent" | "coding-agent";
+type AgentType = "search-agent" | "rag-agent" | "pdf-agent" | "coding-agent" | "research-agent" | "data-agent" | "writer-agent";
 
 const AGENTS: { id: AgentType; label: string; color: string; desc: string }[] = [
   { id: "search-agent", label: "Search", color: "bg-sky-500", desc: "web search + fetch" },
   { id: "rag-agent", label: "RAG", color: "bg-violet-500", desc: "pgvector grounded" },
   { id: "pdf-agent", label: "PDF", color: "bg-amber-500", desc: "parse + summarize" },
   { id: "coding-agent", label: "Code", color: "bg-emerald-500", desc: "generate + sandbox" },
+  { id: "research-agent", label: "Research", color: "bg-orange-500", desc: "sub-questions + cross-check" },
+  { id: "data-agent", label: "Data", color: "bg-cyan-500", desc: "CSV/Excel + trends" },
+  { id: "writer-agent", label: "Writer", color: "bg-pink-500", desc: "report generation" },
 ];
 
 function AgentNode({ data, selected }: { data: { agent_id: AgentType; instruction: string; label: string }; selected?: boolean }) {

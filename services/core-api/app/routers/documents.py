@@ -15,8 +15,15 @@ from app.models.user import User
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
-ALLOWED_CONTENT_TYPES = {"application/pdf"}
-ALLOWED_EXTENSIONS = {".pdf"}
+# Phase 19: Data Agent needs CSV/Excel; keep PDF for RAG. Allowlist per §25.
+ALLOWED_CONTENT_TYPES = {
+    "application/pdf",
+    "text/csv",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "text/plain",  # some browsers send CSV as text/plain
+}
+ALLOWED_EXTENSIONS = {".pdf", ".csv", ".xlsx", ".xls", ".txt"}
 _UNSAFE_CHARS = re.compile(r"[^A-Za-z0-9._ -]")
 _CHUNK = 1024 * 1024
 
@@ -74,35 +81,53 @@ async def upload_document(
 ) -> DocumentInfo:
     """Blueprint §25: type allow-list + size cap + sanitized, randomized
     storage name outside any web-servable root.
+    Phase 19 adds CSV/Excel for Data Agent.
     """
-    if (file.content_type or "").lower() not in ALLOWED_CONTENT_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail="Only PDF uploads are supported in MVP",
-        )
-
+    ctype = (file.content_type or "").lower().split(";")[0].strip()
     safe_name = _sanitize_filename(file.filename)
-    if Path(safe_name).suffix.lower() not in ALLOWED_EXTENSIONS:
+    ext = Path(safe_name).suffix.lower()
+
+    # allow if either content-type or extension is in allowlist (browsers vary)
+    if ctype not in ALLOWED_CONTENT_TYPES and ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail="File extension must be .pdf",
+            detail=f"Unsupported file type '{ctype or ext}'. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+        )
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=f"File extension must be one of {', '.join(sorted(ALLOWED_EXTENSIONS))}",
         )
 
     payload = await _read_upload(file)
-    if not payload.startswith(b"%PDF"):
+    # PDF magic-byte check only for PDFs
+    if ext == ".pdf" and not payload.startswith(b"%PDF"):
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail="File content does not look like a PDF",
         )
+    # basic sanity for CSV: must contain a comma or newline
+    if ext in {".csv", ".txt"} and len(payload) > 0 and b"," not in payload[:1024] and b"\n" not in payload[:1024]:
+        # allow but note; some single-column CSVs have no comma
+        pass
 
-    stored_name = f"{uuid.uuid4().hex}.pdf"
+    stored_name = f"{uuid.uuid4().hex}{ext}"
     (_storage_dir() / stored_name).write_bytes(payload)
+    # normalize content_type for storage
+    _ext_to_ctype = {
+        ".pdf": "application/pdf",
+        ".csv": "text/csv",
+        ".txt": "text/plain",
+        ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ".xls": "application/vnd.ms-excel",
+    }
+    stored_ctype = ctype if ctype in ALLOWED_CONTENT_TYPES else _ext_to_ctype.get(ext, "application/octet-stream")
 
     doc = Document(
         user_id=current_user.id,
         original_filename=safe_name,
         stored_name=stored_name,
-        content_type="application/pdf",
+        content_type=stored_ctype,
         size_bytes=len(payload),
         status=STATUS_UPLOADED,
     )
