@@ -17,6 +17,7 @@ type ModelUsage = {
   tokens_in: number;
   tokens_out: number;
   avg_latency_ms: number;
+  est_cost_usd: number;
 };
 
 type DailyUsage = { day: string; calls: number; tokens_in: number; tokens_out: number };
@@ -28,6 +29,7 @@ type UsageSummary = {
   tokens_in: number;
   tokens_out: number;
   avg_latency_ms: number;
+  est_cost_usd: number;
   by_model: ModelUsage[];
   by_day: DailyUsage[];
 };
@@ -92,10 +94,10 @@ export default function DashboardPage() {
       {!loading && summary && (
         <>
           <section className="grid gap-3 sm:grid-cols-4">
-            <StatCard icon={<Activity className="h-4 w-4 text-sky-500" />} label="Requests" value={summary.total_calls.toLocaleString()} sub={`${summary.cached_calls} cached`} />
+            <StatCard icon={<Activity className="h-4 w-4 text-sky-500" />} label="Requests" value={summary.total_calls.toLocaleString()} sub={`${summary.cached_calls} cached · ${cacheRate}% hit`} />
             <StatCard icon={<Coins className="h-4 w-4 text-violet-500" />} label="Tokens" value={fmt(summary.tokens_in + summary.tokens_out)} sub={`${fmt(summary.tokens_in)} in · ${fmt(summary.tokens_out)} out`} />
             <StatCard icon={<Gauge className="h-4 w-4 text-emerald-500" />} label="Avg latency" value={`${Math.round(summary.avg_latency_ms)} ms`} sub={`last ${summary.days} days`} />
-            <StatCard icon={<Zap className="h-4 w-4 text-amber-500" />} label="Cache hit rate" value={`${cacheRate}%`} sub="Redis response cache" />
+            <StatCard icon={<Zap className="h-4 w-4 text-amber-500" />} label="Est. cost" value={`$${summary.est_cost_usd.toFixed(4)}`} sub="rough list-price estimate" />
           </section>
 
           <Card>
@@ -128,6 +130,7 @@ export default function DashboardPage() {
                       <th className="py-2 text-right font-medium">Tokens in</th>
                       <th className="py-2 text-right font-medium">Tokens out</th>
                       <th className="py-2 text-right font-medium">Avg latency</th>
+                      <th className="py-2 text-right font-medium">Est. cost</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -139,6 +142,7 @@ export default function DashboardPage() {
                         <td className="py-2 text-right">{m.tokens_in.toLocaleString()}</td>
                         <td className="py-2 text-right">{m.tokens_out.toLocaleString()}</td>
                         <td className="py-2 text-right">{Math.round(m.avg_latency_ms)} ms</td>
+                        <td className="py-2 text-right">${m.est_cost_usd.toFixed(4)}</td>
                       </tr>
                     ))}
                   </tbody>

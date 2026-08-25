@@ -27,6 +27,7 @@ class ModelUsage(BaseModel):
     tokens_in: int
     tokens_out: int
     avg_latency_ms: float
+    est_cost_usd: float
 
 
 class DailyUsage(BaseModel):
@@ -43,6 +44,7 @@ class UsageSummary(BaseModel):
     tokens_in: int
     tokens_out: int
     avg_latency_ms: float
+    est_cost_usd: float
     by_model: list[ModelUsage]
     by_day: list[DailyUsage]
 
@@ -64,6 +66,7 @@ async def usage_summary(
                 func.coalesce(func.sum(ApiUsage.tokens_in), 0).label("tokens_in"),
                 func.coalesce(func.sum(ApiUsage.tokens_out), 0).label("tokens_out"),
                 func.coalesce(func.avg(ApiUsage.latency_ms), 0.0).label("avg_latency"),
+                func.coalesce(func.sum(ApiUsage.estimated_cost), 0.0).label("est_cost"),
             ).where(scope)
         )
     ).one()
@@ -77,6 +80,7 @@ async def usage_summary(
                 func.coalesce(func.sum(ApiUsage.tokens_in), 0).label("tokens_in"),
                 func.coalesce(func.sum(ApiUsage.tokens_out), 0).label("tokens_out"),
                 func.avg(ApiUsage.latency_ms).label("avg_latency"),
+                func.coalesce(func.sum(ApiUsage.estimated_cost), 0.0).label("est_cost"),
             )
             .where(scope)
             .group_by(ApiUsage.provider, ApiUsage.model)
@@ -107,6 +111,7 @@ async def usage_summary(
         tokens_in=int(totals.tokens_in or 0),
         tokens_out=int(totals.tokens_out or 0),
         avg_latency_ms=round(float(totals.avg_latency or 0), 1),
+        est_cost_usd=round(float(totals.est_cost or 0), 6),
         by_model=[
             ModelUsage(
                 provider=r.provider,
@@ -115,6 +120,7 @@ async def usage_summary(
                 tokens_in=int(r.tokens_in),
                 tokens_out=int(r.tokens_out),
                 avg_latency_ms=round(float(r.avg_latency or 0), 1),
+                est_cost_usd=round(float(r.est_cost or 0), 6),
             )
             for r in model_rows
         ],

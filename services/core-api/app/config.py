@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     rag_embed_batch: int = 32
 
     sandbox_path: str = "/tmp/nexora_sandbox"
+
+    # Phase 26: JSON {"model-substring": [in $/1M, out $/1M]}; "*" = fallback
+    llm_cost_table_json: str | None = None
     code_execution_timeout_seconds: float = 10.0
     code_execution_max_output_bytes: int = 50_000
     code_execution_max_code_bytes: int = 30_000

@@ -2,7 +2,6 @@ import hashlib
 import json
 import time
 import uuid
-from decimal import Decimal
 from typing import Any, Protocol
 
 from redis.asyncio import Redis
@@ -154,6 +153,7 @@ class LLMGateway:
         user_id: uuid.UUID | None,
         response: LLMResponse,
     ) -> None:
+        from app.llm.pricing import estimate_cost
         from app.models.api_usage import ApiUsage
 
         db.add(
@@ -163,7 +163,7 @@ class LLMGateway:
                 model=response.model,
                 tokens_in=response.tokens_in,
                 tokens_out=response.tokens_out,
-                estimated_cost=Decimal("0"),
+                estimated_cost=estimate_cost(response.provider, response.model, response.tokens_in, response.tokens_out),
                 latency_ms=response.latency_ms,
                 cached=response.cached,
             )
