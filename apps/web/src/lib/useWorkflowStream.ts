@@ -24,6 +24,7 @@ export type WorkflowStream = {
   events: WorkflowStreamEvent[];
   stepStatus: Record<number, StepRunStatus>;
   workflowStatus: string | null;
+  synthesis: string;
   finalReady: boolean;
   error: string | null;
 };
@@ -34,6 +35,7 @@ export function useWorkflowStream(workflowId: string | null, enabled: boolean): 
   const [events, setEvents] = React.useState<WorkflowStreamEvent[]>([]);
   const [stepStatus, setStepStatus] = React.useState<Record<number, StepRunStatus>>({});
   const [workflowStatus, setWorkflowStatus] = React.useState<string | null>(null);
+  const [synthesis, setSynthesis] = React.useState("");
   const [finalReady, setFinalReady] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const finalReadyRef = React.useRef(false);
@@ -44,6 +46,7 @@ export function useWorkflowStream(workflowId: string | null, enabled: boolean): 
       setEvents([]);
       setStepStatus({});
       setWorkflowStatus(null);
+      setSynthesis("");
       setFinalReady(false);
       finalReadyRef.current = false;
       return;
@@ -83,6 +86,8 @@ export function useWorkflowStream(workflowId: string | null, enabled: boolean): 
         typeof data.status === "string"
       ) {
         setWorkflowStatus(data.status);
+      } else if (ev.type === "SYNTHESIS_DELTA" && typeof data.text === "string") {
+        setSynthesis((prev) => prev + (data.text as string));
       } else if (ev.type === "FINAL_RESPONSE_READY") {
         setFinalReady(true);
         finalReadyRef.current = true;
@@ -130,5 +135,5 @@ export function useWorkflowStream(workflowId: string | null, enabled: boolean): 
     };
   }, [workflowId, enabled]);
 
-  return { connected, events, stepStatus, workflowStatus, finalReady, error };
+  return { connected, events, stepStatus, workflowStatus, synthesis, finalReady, error };
 }

@@ -131,6 +131,23 @@ class LLMGateway:
         model = settings.llm_embedding_model
         return await self._provider.embed(texts, model=model)
 
+    async def generate_stream(
+        self,
+        prompt: str,
+        tier: str = ModelTier.FLASH,
+        system: str | None = None,
+    ):
+        """Phase 25: token streaming. Yields visible text chunks; falls back to
+        a single chunk for providers without stream support."""
+        model = self.model_for_tier(tier)
+        stream_fn = getattr(self._provider, "generate_stream", None)
+        if stream_fn is None:
+            resp = await self.generate(prompt=prompt, tier=tier, system=system)
+            yield resp.text
+            return
+        async for chunk in stream_fn(prompt=prompt, model=model, system=system, max_output_tokens=settings.llm_max_output_tokens):
+            yield chunk
+
     @staticmethod
     async def record_usage(
         db: AsyncSession,

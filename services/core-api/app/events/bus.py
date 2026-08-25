@@ -11,7 +11,8 @@ from typing import Any
 
 from app.config import settings
 
-# Event types exactly as listed in blueprint §19 (plus TASK_CREATED/AGENT_SELECTED)
+# Event types exactly as listed in blueprint §19 (plus TASK_CREATED/AGENT_SELECTED,
+# plus Phase 25 synthesis streaming deltas)
 EVENT_TYPES = {
     "TASK_CREATED",
     "AGENT_SELECTED",
@@ -23,6 +24,8 @@ EVENT_TYPES = {
     "WORKFLOW_COMPLETED",
     "FINAL_RESPONSE_READY",
     "WORKFLOW_STARTED",
+    "SYNTHESIS_DELTA",
+    "SYNTHESIS_DONE",
 }
 
 def _channel(workflow_id: str) -> str:

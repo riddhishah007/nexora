@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import get_current_user
+from app.events.bus import emit
 from app.llm import get_llm_gateway
 from app.llm.gateway import LLMGateway
 from app.models.conversation import Conversation, Message
@@ -270,9 +271,23 @@ async def _execute_chat_workflow(workflow_id: uuid.UUID, user_id) -> None:
             ).scalars().all()
             ok = await execute_workflow(db, step_rows, user_id)
             wf.status = STATUS_DONE if ok else STATUS_FAILED
-            final_answer = await _finalize_chat(db, wf, step_rows, user_id)
+
+            # Phase 25: stream synthesis tokens to live subscribers
+            from app.orchestrator.executor import synthesize_final_answer_streaming
+
+            synth_text, synth_llm = await synthesize_final_answer_streaming(str(wf.id), step_rows, str(user_id))
+            if synth_llm is not None:
+                try:
+                    await LLMGateway.record_usage(db, user_id, synth_llm)
+                except Exception:
+                    pass
+            final_answer = synth_text or next(
+                (s.output.get("answer") for s in reversed(step_rows) if s.output and "answer" in s.output),
+                "Plan executed.",
+            )
             db.add(Message(conversation_id=wf.conversation_id, role="assistant", content=str(final_answer), workflow_id=wf.id))
             await db.commit()
+            await emit(str(wf.id), "FINAL_RESPONSE_READY", {"synthesized": bool(synth_llm)})
     except Exception as exc:  # noqa: BLE001 — background task must never bubble
         print(f"[chat-start] execution failed: {exc}")
         try:

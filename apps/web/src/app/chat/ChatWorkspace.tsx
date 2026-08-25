@@ -180,7 +180,14 @@ export default function ChatPage() {
               {conversation.messages.map((m) => (
                 <MessageRow key={m.id} message={m} />
               ))}
-              {sending && pendingRun && <PendingRunBubble pending={pendingRun} statuses={stream.stepStatus} connected={stream.connected} />}
+              {sending && pendingRun && (
+                <PendingRunBubble
+                  pending={pendingRun}
+                  statuses={stream.stepStatus}
+                  connected={stream.connected}
+                  synthesis={stream.synthesis}
+                />
+              )}
               {sending && !pendingRun && <PendingIndicator />}
               <div ref={bottomRef} />
             </div>
@@ -254,10 +261,12 @@ function PendingRunBubble({
   pending,
   statuses,
   connected,
+  synthesis,
 }: {
   pending: PendingRun;
   statuses: Record<number, StepRunStatus>;
   connected: boolean;
+  synthesis: string;
 }) {
   return (
     <div className="flex items-start gap-3">
@@ -284,10 +293,17 @@ function PendingRunBubble({
             );
           })}
         </div>
-        <div className="inline-flex items-center gap-2 rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground">
-          <Loader2 className="h-3 w-3 animate-spin text-primary" />
-          {connected ? "Agents working…" : "Connecting to live stream…"}
-        </div>
+        {synthesis ? (
+          <div className="inline-block rounded-tl-sm rounded-2xl bg-muted px-4 py-2.5 text-sm">
+            <MarkdownLite text={synthesis} />
+            <span className="ml-0.5 inline-block h-3.5 w-[2px] animate-pulse bg-primary align-middle" />
+          </div>
+        ) : (
+          <div className="inline-flex items-center gap-2 rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3 w-3 animate-spin text-primary" />
+            {connected ? "Agents working…" : "Connecting to live stream…"}
+          </div>
+        )}
       </div>
     </div>
   );

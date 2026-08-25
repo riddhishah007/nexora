@@ -206,3 +206,58 @@ async def synthesize_final_answer(steps: list[WorkflowStep], user_id: str) -> tu
     llm.latency_ms = int((time.perf_counter() - started) * 1000) if llm.latency_ms == 0 else llm.latency_ms
     # Record usage — caller will handle db session
     return llm.text, llm
+
+
+async def synthesize_final_answer_streaming(
+    workflow_id: str,
+    steps: list[WorkflowStep],
+    user_id: str,
+) -> tuple[str, object]:
+    """Phase 25: same contract as synthesize_final_answer, but streams synthesis
+    tokens to live subscribers as SYNTHESIS_DELTA events on the workflow channel,
+    then SYNTHESIS_DONE. Falls back to non-streaming generate() if the stream
+    fails mid-flight (text accumulated so far + remainder via blocking call).
+    """
+    from app.config import settings
+    from app.events.bus import emit
+    from app.llm import get_llm_gateway
+    from app.llm.schemas import LLMResponse
+
+    successful = [s for s in steps if s.status == STEP_DONE and s.output and s.output.get("answer")]
+    if not successful:
+        return "No agent produced an answer.", None  # type: ignore[return-value]
+    if len(successful) == 1:
+        return successful[0].output["answer"], None  # type: ignore[index]
+
+    blocks = []
+    for s in successful:
+        ans = s.output.get("answer", "")[:1500]
+        blocks.append(f"[Step {s.seq} — {s.agent_id}]\nInstruction: {s.instruction}\nOutput: {ans}")
+    prompt = "Combine these agent results into one final answer:\n\n" + "\n\n".join(blocks)
+
+    gateway = get_llm_gateway()
+    started = time.perf_counter()
+    parts: list[str] = []
+    try:
+        async for chunk in gateway.generate_stream(prompt=prompt, tier=ModelTier.FLASH, system=SYNTH_SYSTEM):
+            parts.append(chunk)
+            await emit(workflow_id, "SYNTHESIS_DELTA", {"seq": -1, "text": chunk})
+    except Exception as exc:
+        # stream broke — complete via blocking call so the user still gets an answer
+        print(f"[synth-stream] failed ({exc}); falling back to blocking generate")
+        text, _llm = await synthesize_final_answer(steps, user_id)
+        return text, _llm
+
+    full = "".join(parts).strip()
+    model = gateway.model_for_tier(ModelTier.FLASH)
+    llm = LLMResponse(
+        text=full,
+        provider=settings.llm_provider,
+        model=model,
+        tokens_in=len(prompt) // 4,
+        tokens_out=len(full) // 4,
+        latency_ms=int((time.perf_counter() - started) * 1000),
+        mock=False,
+    )
+    await emit(workflow_id, "SYNTHESIS_DONE", {"length": len(full)})
+    return full, llm
