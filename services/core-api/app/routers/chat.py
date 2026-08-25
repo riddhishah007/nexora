@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -73,42 +74,76 @@ async def chat(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ChatResponse:
-    # Phase 17: prompt-injection scan before any agent sees the input
+    """Synchronous chat: blocks until plan + agents + synthesis finish."""
+    conversation, workflow, step_rows = await _prepare_chat(payload, request, current_user, db)
+
+    ok = await execute_workflow(db, step_rows, current_user.id)
+    workflow.status = STATUS_DONE if ok else STATUS_FAILED
+    final_answer = await _finalize_chat(db, workflow, step_rows, current_user.id)
+    db.add(
+        Message(
+            conversation_id=conversation.id,
+            role="assistant",
+            content=str(final_answer),
+            workflow_id=workflow.id,
+        )
+    )
+    await db.commit()
+
+    return _chat_response(conversation.id, workflow, step_rows)
+
+
+@router.post("/chat/start", response_model=ChatResponse)
+async def chat_start(
+    payload: ChatRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ChatResponse:
+    """Phase 22: two-phase chat — returns the plan immediately and executes in the background.
+
+    Clients subscribe to WS /ws/workflows/{workflow_id} for live AGENT_* events;
+    FINAL_RESPONSE_READY signals the assistant message is persisted.
+    """
+    conversation, workflow, step_rows = await _prepare_chat(payload, request, current_user, db)
+    asyncio.create_task(_execute_chat_workflow(workflow.id, current_user.id))
+    return _chat_response(conversation.id, workflow, step_rows)
+
+
+async def _scan_or_raise(payload: ChatRequest, request: Request, current_user: User, db: AsyncSession) -> None:
     from app.security.events import log_security_event
     from app.security.injection import scan as injection_scan
 
     scan = injection_scan(payload.message)
+    if not scan["should_block"] and scan["score"] == 0:
+        return
+    try:
+        await log_security_event(
+            db,
+            event_type="prompt_injection",
+            risk_level=scan["risk_level"],
+            blocked=bool(scan["should_block"]),
+            user_id=current_user.id,
+            details={"score": scan["score"], "matched": scan["matched"], "message_preview": payload.message[:300]},
+            ip_address=request.client.host if request.client else None,
+        )
+    except Exception:
+        pass
     if scan["should_block"]:
-        try:
-            await log_security_event(
-                db,
-                event_type="prompt_injection",
-                risk_level=scan["risk_level"],
-                blocked=True,
-                user_id=current_user.id,
-                details={"score": scan["score"], "matched": scan["matched"], "message_preview": payload.message[:300]},
-                ip_address=request.client.host if request.client else None,
-            )
-        except Exception:
-            pass
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Blocked: potential prompt injection detected (risk={scan['risk_level']}, score={scan['score']}) — matched: {', '.join(scan['matched'][:3])}",
         )
-    elif scan["score"] > 0:
-        # log medium/low risk but allow
-        try:
-            await log_security_event(
-                db,
-                event_type="prompt_injection",
-                risk_level=scan["risk_level"],
-                blocked=False,
-                user_id=current_user.id,
-                details={"score": scan["score"], "matched": scan["matched"]},
-                ip_address=request.client.host if request.client else None,
-            )
-        except Exception:
-            pass
+
+
+async def _prepare_chat(
+    payload: ChatRequest,
+    request: Request,
+    current_user: User,
+    db: AsyncSession,
+) -> tuple[Conversation, Workflow, list[WorkflowStep]]:
+    """Shared by /chat and /chat/start: scan, persist user msg, plan, persist steps."""
+    await _scan_or_raise(payload, request, current_user, db)
 
     if payload.conversation_id:
         result = await db.execute(
@@ -172,45 +207,36 @@ async def chat(
     except Exception:
         pass
 
-    ok = await execute_workflow(db, step_rows, current_user.id)
-    workflow.status = STATUS_DONE if ok else STATUS_FAILED
+    return conversation, workflow, step_rows
 
-    # Phase 14 synthesis: combine parallel branch outputs when >1 successful step.
-    synth_text, synth_llm = await synthesize_final_answer(step_rows, str(current_user.id))
+
+async def _finalize_chat(db: AsyncSession, workflow: Workflow, step_rows: list[WorkflowStep], user_id) -> str:
+    """Synthesis + FINAL_RESPONSE_READY. Mutates workflow.status caller-side."""
+    synth_text, synth_llm = await synthesize_final_answer(step_rows, str(user_id))
     if synth_llm is not None:
         try:
-            await LLMGateway.record_usage(db, current_user.id, synth_llm)
+            await LLMGateway.record_usage(db, user_id, synth_llm)
         except Exception:
             pass
         final_answer = synth_text
-        try:
-            from app.events.bus import emit as _emit2
-            await _emit2(str(workflow.id), "FINAL_RESPONSE_READY", {"synthesized": True, "length": len(final_answer)})
-        except Exception:
-            pass
+        synthesized = True
     else:
-        # single-step or no synthesis needed
         final_answer = synth_text if synth_text else next(
             (s.output.get("answer") for s in reversed(step_rows) if s.output and "answer" in s.output),
             "Plan executed.",
         )
-        try:
-            from app.events.bus import emit as _emit3
-            await _emit3(str(workflow.id), "FINAL_RESPONSE_READY", {"synthesized": False, "length": len(final_answer)})
-        except Exception:
-            pass
-    db.add(
-        Message(
-            conversation_id=conversation.id,
-            role="assistant",
-            content=str(final_answer),
-            workflow_id=workflow.id,
-        )
-    )
-    await db.commit()
+        synthesized = False
+    try:
+        from app.events.bus import emit as _emit2
+        await _emit2(str(workflow.id), "FINAL_RESPONSE_READY", {"synthesized": synthesized, "length": len(final_answer)})
+    except Exception:
+        pass
+    return final_answer
 
+
+def _chat_response(conversation_id, workflow: Workflow, step_rows: list[WorkflowStep]) -> ChatResponse:
     return ChatResponse(
-        conversation_id=conversation.id,
+        conversation_id=conversation_id,
         workflow_id=workflow.id,
         status=workflow.status,
         steps=[
@@ -224,6 +250,49 @@ async def chat(
             for s in step_rows
         ],
     )
+
+
+async def _execute_chat_workflow(workflow_id: uuid.UUID, user_id) -> None:
+    """Background half of /chat/start: execute → synthesize → persist answer.
+
+    Uses its own session factory; never raises to the caller. Always emits
+    FINAL_RESPONSE_READY (even on failure) so subscribed clients unblock.
+    """
+    from app.database import SessionFactory
+
+    try:
+        async with SessionFactory() as db:
+            wf = (await db.execute(select(Workflow).where(Workflow.id == workflow_id))).scalar_one_or_none()
+            if wf is None:
+                return
+            step_rows = (
+                await db.execute(select(WorkflowStep).where(WorkflowStep.workflow_id == wf.id).order_by(WorkflowStep.seq))
+            ).scalars().all()
+            ok = await execute_workflow(db, step_rows, user_id)
+            wf.status = STATUS_DONE if ok else STATUS_FAILED
+            final_answer = await _finalize_chat(db, wf, step_rows, user_id)
+            db.add(Message(conversation_id=wf.conversation_id, role="assistant", content=str(final_answer), workflow_id=wf.id))
+            await db.commit()
+    except Exception as exc:  # noqa: BLE001 — background task must never bubble
+        print(f"[chat-start] execution failed: {exc}")
+        try:
+            async with SessionFactory() as db:
+                wf = (await db.execute(select(Workflow).where(Workflow.id == workflow_id))).scalar_one_or_none()
+                if wf is None:
+                    return
+                wf.status = STATUS_FAILED
+                db.add(
+                    Message(
+                        conversation_id=wf.conversation_id,
+                        role="assistant",
+                        content=f"Execution failed: {exc}",
+                        workflow_id=wf.id,
+                    )
+                )
+                await db.commit()
+                await emit(str(wf.id), "FINAL_RESPONSE_READY", {"error": str(exc)[:200]})
+        except Exception:
+            pass
 
 
 @router.get("/conversations", response_model=list[ConversationSummary])

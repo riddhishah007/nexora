@@ -7,7 +7,12 @@ import { Bot, Check, Loader2, Plus, Send, User as UserIcon, X } from "lucide-rea
 
 import { Button } from "@/components/ui/button";
 import { apiFetch, getToken, type ChatMessage, type ChatResponse, type ConversationDetail, type ConversationSummary, type Workflow } from "@/lib/api";
+import { useWorkflowStream, type StepRunStatus } from "@/lib/useWorkflowStream";
 import { cn } from "@/lib/utils";
+
+type SeedStep = { seq: number; agent_id: string; instruction: string; status: string };
+
+type PendingRun = { workflowId: string; conversationId: string; seedSteps: SeedStep[] };
 
 export default function ChatPage() {
   const router = useRouter();
@@ -18,10 +23,12 @@ export default function ChatPage() {
   const [conversation, setConversation] = React.useState<ConversationDetail | null>(null);
   const [input, setInput] = React.useState("");
   const [sending, setSending] = React.useState(false);
+  const [pendingRun, setPendingRun] = React.useState<PendingRun | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const bottomRef = React.useRef<HTMLDivElement>(null);
 
   const authed = React.useMemo(() => Boolean(getToken()), []);
+  const stream = useWorkflowStream(pendingRun?.workflowId ?? null, Boolean(pendingRun));
 
   React.useEffect(() => {
     if (!authed) router.push("/login");
@@ -33,7 +40,7 @@ export default function ChatPage() {
     apiFetch<ConversationSummary[]>("/conversations")
       .then(setConversations)
       .catch(() => {});
-  }, [authed, sending]);
+  }, [authed, sending, pendingRun]);
 
   // active thread
   React.useEffect(() => {
@@ -41,10 +48,45 @@ export default function ChatPage() {
       setConversation(null);
       return;
     }
+    if (sending && pendingRun && pendingRun.conversationId === activeId) return; // already loaded optimistically
     apiFetch<ConversationDetail>(`/conversations/${activeId}`)
       .then(setConversation)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
-  }, [activeId, sending]);
+  }, [activeId, sending, pendingRun]);
+
+  function finishRun(detail: ConversationDetail | null) {
+    if (detail) setConversation(detail);
+    setPendingRun(null);
+    setSending(false);
+  }
+
+  // run finished → load persisted assistant message and stop streaming
+  const convIdRef = React.useRef<string | null>(conversation?.id ?? null);
+  React.useEffect(() => {
+    convIdRef.current = conversation?.id ?? null;
+  }, [conversation]);
+  React.useEffect(() => {
+    if (!stream.finalReady || !pendingRun) return;
+    const cid = convIdRef.current || pendingRun.conversationId;
+    apiFetch<ConversationDetail>(`/conversations/${cid}`)
+      .then(finishRun)
+      .catch(() => finishRun(null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stream.finalReady]);
+
+  // polling fallback in case the WS stream is unavailable
+  React.useEffect(() => {
+    if (!pendingRun) return;
+    const t = setInterval(async () => {
+      try {
+        const detail = await apiFetch<ConversationDetail>(`/conversations/${pendingRun.conversationId}`);
+        const last = detail.messages[detail.messages.length - 1];
+        if (last?.role === "assistant" && last.workflow_id === pendingRun.workflowId) finishRun(detail);
+      } catch {}
+    }, 4000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingRun?.workflowId]);
 
   React.useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -57,20 +99,28 @@ export default function ChatPage() {
     setError(null);
     setSending(true);
     try {
-      const res = await apiFetch<ChatResponse>("/chat", {
+      const res = await apiFetch<ChatResponse>("/chat/start", {
         method: "POST",
         body: JSON.stringify({ message, conversation_id: activeId || null }),
       });
+      const seedSteps: SeedStep[] = res.steps.map((s) => ({
+        seq: s.seq,
+        agent_id: s.agent_id,
+        instruction: s.instruction,
+        status: s.status,
+      }));
       if (!activeId || res.conversation_id !== activeId) {
+        // new thread: load it immediately (user message is already persisted)
+        try {
+          const detail = await apiFetch<ConversationDetail>(`/conversations/${res.conversation_id}`);
+          setConversation(detail);
+        } catch {}
         router.replace(`/chat?c=${res.conversation_id}`);
-      } else {
-        const detail = await apiFetch<ConversationDetail>(`/conversations/${activeId}`);
-        setConversation(detail);
       }
+      setPendingRun({ workflowId: res.workflow_id, conversationId: res.conversation_id, seedSteps });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
       setSending(false);
+      setError(e instanceof Error ? e.message : String(e));
     }
   }
 
@@ -127,7 +177,8 @@ export default function ChatPage() {
               {conversation.messages.map((m) => (
                 <MessageRow key={m.id} message={m} />
               ))}
-              {sending && <PendingIndicator />}
+              {sending && pendingRun && <PendingRunBubble pending={pendingRun} statuses={stream.stepStatus} connected={stream.connected} />}
+              {sending && !pendingRun && <PendingIndicator />}
               <div ref={bottomRef} />
             </div>
           )}
@@ -191,6 +242,49 @@ function PendingIndicator() {
           <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:300ms]" />
         </span>
         Planning · running agents · synthesizing…
+      </div>
+    </div>
+  );
+}
+
+function PendingRunBubble({
+  pending,
+  statuses,
+  connected,
+}: {
+  pending: PendingRun;
+  statuses: Record<number, StepRunStatus>;
+  connected: boolean;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <Avatar role="assistant" />
+      <div className="min-w-0 max-w-[85%]">
+        <div className="mb-1.5 flex flex-wrap items-center gap-1">
+          {pending.seedSteps.map((step) => {
+            const st = statuses[step.seq] || (step.status === "pending" ? "pending" : undefined);
+            return (
+              <span
+                key={step.seq}
+                title={`${step.agent_id}: ${step.instruction}`}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[10px]",
+                  CHIP_STYLES[st === "done" ? "done" : st === "failed" ? "failed" : st === "running" || st === "selected" ? "running" : ""] ||
+                    "border-border bg-muted text-muted-foreground"
+                )}
+              >
+                {st === "running" && <Loader2 className="h-2.5 w-2.5 animate-spin" />}
+                {st === "done" && <Check className="h-2.5 w-2.5" />}
+                {st === "failed" && <X className="h-2.5 w-2.5" />}
+                {step.seq}. {step.agent_id}
+              </span>
+            );
+          })}
+        </div>
+        <div className="inline-flex items-center gap-2 rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin text-primary" />
+          {connected ? "Agents working…" : "Connecting to live stream…"}
+        </div>
       </div>
     </div>
   );
