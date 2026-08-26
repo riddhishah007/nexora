@@ -135,6 +135,9 @@ export default function ChatPage() {
           <Link href="/workflows" className="text-xs text-muted-foreground hover:text-foreground">
             Workflows
           </Link>
+          <Link href="/rag" className="text-xs text-muted-foreground hover:text-foreground">
+            RAG
+          </Link>
           <Link href="/dashboard" className="text-xs text-muted-foreground hover:text-foreground">
             Usage
           </Link>

@@ -12,7 +12,9 @@ Full architecture, security model, and roadmap: see
 [`docs/architecture/PROJECT_BLUEPRINT_V1.md`](./docs/architecture/PROJECT_BLUEPRINT_V1.md).
 
 ## Status
-🚧 **Phase 30 — RAG inspector + eval CLI.** `POST /api/v1/rag/search` returns raw hybrid hits with `distance` + `score` (no LLM) — same `retrieve` as `rag/query` but without synthesis, plus `alpha`/`rerank_enabled` echo for the inspector UI. `POST /rag/query` citations now include `score`. CLI `scripts/rag_eval.py --offline|--live --fixture --user-id` wraps `evaluate_offline`/`evaluate_live` with human + `--json` output; demo: `python scripts/rag_eval.py --offline` → 3 cases `recall=0.50 mrr=0.67 hit_rate=0.67`. Verified: `openapi.json` lists `/rag/search`, `py_compile` clean, 66/66 tests pass, `core-api` rebuilt.
+🚧 **Phase 31 — RAG chunk inspector page.** New `apps/web/src/app/rag/page.tsx`: score-sorted `POST /rag/search` inspector — query input, `top_k` selector, optional `document_id` filter, hybrid `α`/`rerank_enabled` echo, per-hit `distance` + `score` with percentage bar, `chunk_id`/`document_id` provenance, and empty-state tips. Linked from chat sidebar (`RAG`). Verified: `next build` 6.9s → 11 routes (new `/rag`), `tsc` clean, `GET /health` 200, `openapi.json` confirms `/rag/search`.
+
+**Phase 30 — RAG inspector + eval CLI.** `POST /api/v1/rag/search` returns raw hybrid hits with `distance` + `score` (no LLM) — same `retrieve` as `rag/query` but without synthesis, plus `alpha`/`rerank_enabled` echo for the inspector UI. `POST /rag/query` citations now include `score`. CLI `scripts/rag_eval.py --offline|--live --fixture --user-id` wraps `evaluate_offline`/`evaluate_live` with human + `--json` output; demo: `python scripts/rag_eval.py --offline` → 3 cases `recall=0.50 mrr=0.67 hit_rate=0.67`. Verified: `openapi.json` lists `/rag/search`, `py_compile` clean, 66/66 tests pass, `core-api` rebuilt.
 
 **Phase 29 — RAG golden-set eval harness.** New `app/rag/eval.py`: offline `score_case`/`_ndcg`/`load_golden` + `evaluate_offline` (pure-Python, no DB) and `evaluate_live` (calls `retrieve` per case). Metrics: recall, precision, MRR, NDCG, hit_rate + mean aggregates; fixture `tests/fixtures/rag_golden_small.json` (3 cases). 8 new `test_rag_eval` unit tests (perfect/partial/no-hit, empty-expected, validation, aggregate). Live mode reuses the same scoring after real retrieval — ready for `RAG_QUERY_REWRITE_ENABLED`/`α` A/B. Verified: 66/66 tests pass, `py_compile` clean.
 
@@ -34,7 +36,7 @@ Full architecture, security model, and roadmap: see
 
 **Phase 19 — Specialized agents (Research / Data / Writer).** `research-agent` (sub-questions → multi-search → cross-check → cited synthesis), `data-agent` (CSV/Excel via LLM-generated pandas in sandbox), `writer-agent` (structured markdown reports). Registered in registry + executor + `/agents/run` + builder palette (7 agents). CSV/XLSX/TXT upload allowlist; pandas+openpyxl; Groq `<think>` strip + 429 backoff; templates: Deep Research Report, CSV Analysis Report, Multi-Source Brief. Verified with real runs (6-source cited report; sandbox `exit_code=0` describe() output).
 
-> **Deployment status:** not deployed yet — everything currently runs locally via `docker compose` (`http://localhost:3000` web, `http://localhost:8000/docs` API). Deployment configs are prepped for later: `docs/DEPLOYMENT.md`, `render.yaml`, `fly.worker.toml`. Next up: chunk inspector page (`/rag` UI using `POST /rag/search` scores) + live deploy.
+> **Deployment status:** not deployed yet — everything currently runs locally via `docker compose` (`http://localhost:3000` web, `http://localhost:8000/docs` API). Deployment configs are prepped for later: `docs/DEPLOYMENT.md`, `render.yaml`, `fly.worker.toml`. Next up: live deploy + prod observability polish.
 
 ## Monorepo layout
 
