@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: nexora
+          POSTGRES_PASSWORD: nexora_dev_password
+          POSTGRES_DB: nexora
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://nexora:nexora_dev_password@localhost:5432/nexora
+      REDIS_URL: redis://localhost:6379/0
+      JWT_SECRET: ci_test_secret_change_me
+      REFRESH_TOKEN_SECRET: ci_test_refresh_change_me
+      ENVIRONMENT: development
+      GROQ_API_KEY: ""
+      GEMINI_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: services/core-api/requirements*.txt
+      - name: Install backend deps
+        run: |
+          pip install -r services/core-api/requirements.txt
+          pip install -r services/core-api/requirements-dev.txt
+      - name: Alembic upgrade
+        working-directory: services/core-api
+        run: alembic upgrade head
+      - name: Lint (py_compile)
+        run: |
+          python -m py_compile services/core-api/app/main.py
+          python -m py_compile services/core-api/app/middleware/request_id.py
+          python -m py_compile services/core-api/app/routers/metrics.py
+          python -m py_compile services/core-api/app/rag/service.py
+          python -m py_compile services/core-api/app/rag/eval.py
+      - name: Tests (unit + integration, skips live when stack unreachable)
+        working-directory: services/core-api
+        run: python -m pytest tests/ -v --tb=short
+      - name: RAG eval offline demo
+        working-directory: services/core-api
+        run: python scripts/rag_eval.py --offline
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install
+        working-directory: apps/web
+        run: npm ci
+      - name: Typecheck + build
+        working-directory: apps/web
+        run: npm run build
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build core-api image
+        run: docker compose build core-api
+      - name: Build web image
+        run: docker compose build web
