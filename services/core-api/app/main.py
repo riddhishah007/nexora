@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import app.models  # noqa: F401 — ensure model metadata is registered
 from app.config import settings
 from app.database import engine
+from app.middleware.request_id import RequestIdMiddleware
 from app.routers import (
     agents,
     auth,
@@ -15,6 +16,7 @@ from app.routers import (
     health,
     jobs,
     llm,
+    metrics,
     pdf,
     rag,
     realtime,
@@ -38,6 +40,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(RequestIdMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -46,6 +49,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(metrics.router)
 app.include_router(health.router)
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(llm.router, prefix="/api/v1")

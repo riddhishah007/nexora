@@ -12,7 +12,9 @@ Full architecture, security model, and roadmap: see
 [`docs/architecture/PROJECT_BLUEPRINT_V1.md`](./docs/architecture/PROJECT_BLUEPRINT_V1.md).
 
 ## Status
-🚧 **Phase 31 — RAG chunk inspector page.** New `apps/web/src/app/rag/page.tsx`: score-sorted `POST /rag/search` inspector — query input, `top_k` selector, optional `document_id` filter, hybrid `α`/`rerank_enabled` echo, per-hit `distance` + `score` with percentage bar, `chunk_id`/`document_id` provenance, and empty-state tips. Linked from chat sidebar (`RAG`). Verified: `next build` 6.9s → 11 routes (new `/rag`), `tsc` clean, `GET /health` 200, `openapi.json` confirms `/rag/search`.
+🚧 **Phase 32 — Observability (request-ID + Prometheus /metrics + structured logs).** New `app/middleware/request_id.py`: `RequestIdMiddleware` reuses inbound `X-Request-ID` or generates 12-hex, emits one JSON log per request (`level/method/path/status/duration_ms/request_id/user_id`) to stdout, and maintains in-memory counters (`nexora_http_requests_total`, `by_status`, `duration_ms_sum/count` normalized on `:id`). New `GET /metrics` (`app/routers/metrics.py`) exposes Prometheus text exposition (`version="0.2.0" phase="32"`). Verified: `curl /metrics` → text/plain, `X-Request-ID` header on every response (reuse test), `docker logs` JSON lines, 70/70 tests pass (4 new `test_metrics`), `core-api` rebuilt.
+
+**Phase 31 — RAG chunk inspector page.** New `apps/web/src/app/rag/page.tsx`: score-sorted `POST /rag/search` inspector — query input, `top_k` selector, optional `document_id` filter, hybrid `α`/`rerank_enabled` echo, per-hit `distance` + `score` with percentage bar, `chunk_id`/`document_id` provenance, and empty-state tips. Linked from chat sidebar (`RAG`). Verified: `next build` 6.9s → 11 routes (new `/rag`), `tsc` clean, `GET /health` 200, `openapi.json` confirms `/rag/search`.
 
 **Phase 30 — RAG inspector + eval CLI.** `POST /api/v1/rag/search` returns raw hybrid hits with `distance` + `score` (no LLM) — same `retrieve` as `rag/query` but without synthesis, plus `alpha`/`rerank_enabled` echo for the inspector UI. `POST /rag/query` citations now include `score`. CLI `scripts/rag_eval.py --offline|--live --fixture --user-id` wraps `evaluate_offline`/`evaluate_live` with human + `--json` output; demo: `python scripts/rag_eval.py --offline` → 3 cases `recall=0.50 mrr=0.67 hit_rate=0.67`. Verified: `openapi.json` lists `/rag/search`, `py_compile` clean, 66/66 tests pass, `core-api` rebuilt.
 
@@ -36,7 +38,7 @@ Full architecture, security model, and roadmap: see
 
 **Phase 19 — Specialized agents (Research / Data / Writer).** `research-agent` (sub-questions → multi-search → cross-check → cited synthesis), `data-agent` (CSV/Excel via LLM-generated pandas in sandbox), `writer-agent` (structured markdown reports). Registered in registry + executor + `/agents/run` + builder palette (7 agents). CSV/XLSX/TXT upload allowlist; pandas+openpyxl; Groq `<think>` strip + 429 backoff; templates: Deep Research Report, CSV Analysis Report, Multi-Source Brief. Verified with real runs (6-source cited report; sandbox `exit_code=0` describe() output).
 
-> **Deployment status:** not deployed yet — everything currently runs locally via `docker compose` (`http://localhost:3000` web, `http://localhost:8000/docs` API). Deployment configs are prepped for later: `docs/DEPLOYMENT.md`, `render.yaml`, `fly.worker.toml`. Next up: live deploy + prod observability polish.
+> **Deployment status:** not deployed yet — everything currently runs locally via `docker compose` (`http://localhost:3000` web, `http://localhost:8000/docs` API). Deployment configs are prepped for later: `docs/DEPLOYMENT.md`, `render.yaml`, `fly.worker.toml`. Live: `GET /metrics` → Prometheus counters, `GET /health` → `X-Request-ID` + JSON logs. Next up: live deploy.
 
 ## Monorepo layout
 
