@@ -1,0 +1,17 @@
+[
+  {
+    "query": "What is Nexora?",
+    "expected_chunk_ids": ["00000000-0000-0000-0000-000000000001"],
+    "top_k": 5
+  },
+  {
+    "query": "hybrid search rerank alpha",
+    "expected_chunk_ids": ["00000000-0000-0000-0000-000000000002", "00000000-0000-0000-0000-000000000003"],
+    "top_k": 5
+  },
+  {
+    "query": "pgvector cosine distance retrieval",
+    "expected_chunk_ids": ["00000000-0000-0000-0000-000000000004"],
+    "top_k": 3
+  }
+]
