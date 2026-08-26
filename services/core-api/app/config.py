@@ -63,6 +63,11 @@ class Settings(BaseSettings):
     rag_chunk_overlap: int = 120
     rag_top_k: int = 5
     rag_embed_batch: int = 32
+    # Phase 28: hybrid search + rerank + query rewrite
+    rag_hybrid_alpha: float = 0.6  # weight for vector vs keyword (0.0=keyword only, 1.0=vector only)
+    rag_candidate_multiplier: int = 4  # fetch top_k * multiplier as vector candidates before rerank
+    rag_rerank_enabled: bool = True
+    rag_query_rewrite_enabled: bool = False  # off by default; enable via RAG_QUERY_REWRITE_ENABLED=true
 
     sandbox_path: str = "/tmp/nexora_sandbox"
 
