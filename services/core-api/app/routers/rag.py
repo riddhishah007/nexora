@@ -53,6 +53,7 @@ class RagCitation(BaseModel):
     chunk_index: int
     content: str
     distance: float
+    score: float | None = None
 
 
 class RagQueryResponse(BaseModel):
@@ -63,6 +64,30 @@ class RagQueryResponse(BaseModel):
     model: str
     latency_ms: int
     mock: bool
+
+
+class RagSearchRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=4000)
+    top_k: int | None = Field(default=None, ge=1, le=20)
+    document_id: str | None = Field(default=None, min_length=32, max_length=64)
+
+
+class RagSearchHit(BaseModel):
+    chunk_id: str
+    document_id: str
+    chunk_index: int
+    content: str
+    distance: float
+    score: float | None = None
+
+
+class RagSearchResponse(BaseModel):
+    query: str
+    hits: list[RagSearchHit]
+    count: int
+    # echo hybrid settings so the inspector can explain ranking
+    alpha: float
+    rerank_enabled: bool
 
 
 @router.post("/ingest", response_model=RagIngestJobResponse | RagIngestResponse)
@@ -171,6 +196,7 @@ async def rag_query(
             chunk_index=c.get("chunk_index", 0),
             content=c.get("content", "")[:1200],
             distance=float(c.get("distance", 0)),
+            score=c.get("score"),
         )
         for c in citations_raw
     ]
@@ -183,4 +209,52 @@ async def rag_query(
         model=llm.model,
         latency_ms=llm.latency_ms,
         mock=llm.mock,
+    )
+
+
+@router.post("/search", response_model=RagSearchResponse)
+async def rag_search(
+    payload: RagSearchRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> RagSearchResponse:
+    """Phase 30: raw hybrid retrieval inspector — returns chunks with distance+score (no LLM).
+
+    Useful for debugging hybrid ranking, building a chunk inspector UI, and
+    feeding the golden-set eval harness. Same isolation as `retrieve` (§16).
+    """
+    from app.llm import get_llm_gateway
+    from app.rag.service import retrieve
+
+    top_k = payload.top_k or settings.rag_top_k
+    gateway = get_llm_gateway()
+    try:
+        rows = await retrieve(
+            query=payload.query,
+            db=db,
+            gateway=gateway,
+            user_id=str(current_user.id),
+            top_k=top_k,
+            document_id=payload.document_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from None
+
+    hits = [
+        RagSearchHit(
+            chunk_id=r.get("chunk_id", ""),
+            document_id=r.get("document_id", ""),
+            chunk_index=r.get("chunk_index", 0),
+            content=r.get("content", "")[:1200],
+            distance=float(r.get("distance", 0)),
+            score=r.get("score"),
+        )
+        for r in rows
+    ]
+    return RagSearchResponse(
+        query=payload.query,
+        hits=hits,
+        count=len(hits),
+        alpha=float(settings.rag_hybrid_alpha),
+        rerank_enabled=bool(settings.rag_rerank_enabled),
     )
