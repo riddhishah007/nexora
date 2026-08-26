@@ -51,6 +51,15 @@ export function useWorkflowStream(workflowId: string | null, enabled: boolean): 
       finalReadyRef.current = false;
       return;
     }
+    // Phase 27: reset per-run state when workflowId changes while still enabled
+    setEvents([]);
+    setStepStatus({});
+    setWorkflowStatus(null);
+    setSynthesis("");
+    setFinalReady(false);
+    finalReadyRef.current = false;
+    setConnected(false);
+    setError(null);
     let ws: WebSocket | null = null;
     let closedByUs = false;
     let retry = 0;
@@ -88,6 +97,8 @@ export function useWorkflowStream(workflowId: string | null, enabled: boolean): 
         setWorkflowStatus(data.status);
       } else if (ev.type === "SYNTHESIS_DELTA" && typeof data.text === "string") {
         setSynthesis((prev) => prev + (data.text as string));
+      } else if (ev.type === "SYNTHESIS_DONE") {
+        // synthesis stream complete — no state change needed, deltas already accumulated
       } else if (ev.type === "FINAL_RESPONSE_READY") {
         setFinalReady(true);
         finalReadyRef.current = true;

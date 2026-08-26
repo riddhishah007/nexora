@@ -227,21 +227,20 @@ async def execute_workflow_endpoint(
     workflow.status = STATUS_RUNNING
     await db.commit()
 
-    from app.orchestrator.executor import execute_workflow as run_exec, synthesize_final_answer
+    from app.orchestrator.executor import execute_workflow as run_exec, synthesize_final_answer_streaming
     from app.llm.gateway import LLMGateway
 
     ok = await run_exec(db, steps, current_user.id)
     workflow.status = STATUS_DONE if ok else STATUS_FAILED
 
-    # synthesis if multiple steps
+    # synthesis if multiple steps — streamed as SYNTHESIS_DELTA/DONE (Phase 27: builder parity with chat)
     try:
-        synth_text, synth_llm = await synthesize_final_answer(steps, str(current_user.id))
+        synth_text, synth_llm = await synthesize_final_answer_streaming(str(workflow.id), steps, str(current_user.id))
         if synth_llm is not None:
             try:
                 await LLMGateway.record_usage(db, current_user.id, synth_llm)
             except Exception:
                 pass
-            # store synthesis as extra output on workflow definition for frontend
             workflow.definition = {**(workflow.definition or {}), "synthesis": synth_text}
         elif synth_text and len(steps) > 1:
             workflow.definition = {**(workflow.definition or {}), "synthesis": synth_text}

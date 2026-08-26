@@ -12,7 +12,9 @@ Full architecture, security model, and roadmap: see
 [`docs/architecture/PROJECT_BLUEPRINT_V1.md`](./docs/architecture/PROJECT_BLUEPRINT_V1.md).
 
 ## Status
-🚧 **Phase 26 — Real cost estimation.** New `app/llm/pricing.py`: `estimate_cost(provider, model, tokens_in, out)` computes USD from a model-substring → (input, output) $/1M-tok table (qwen/llama/gemma/gemini entries + wildcard fallback), overridable via env `LLM_COST_TABLE_JSON`. `record_usage` now writes real `estimated_cost` (was hardcoded 0). `/usage/summary` returns `est_cost_usd` totals + per-model; dashboard swaps cache-rate card for **Est. cost** and adds a cost column to the model table. Verified E2E: one chat run (245 in / 843 out tok) → `$0.000277` recorded and surfaced. 50/50 tests pass.
+🚧 **Phase 27 — Builder streaming parity.** Workflow `POST /workflows/{id}/execute` now streams synthesis via `synthesize_final_answer_streaming` (`SYNTHESIS_DELTA`/`SYNTHESIS_DONE` on the same WS workflow channel that already drives node states) — parity with chat's Phase 25 streaming. Builder `Builder.tsx` renders live synthesis with blinking caret in the inspector (streaming while `executing`, persisted synthesis after `FINAL_RESPONSE_READY`). `useWorkflowStream` resets per-run state on workflowId change and handles `SYNTHESIS_DONE`. Verified: `tsc`/build clean, 50/50 tests pass, container rebuilt.
+
+**Phase 26 — Real cost estimation.** New `app/llm/pricing.py`: `estimate_cost(provider, model, tokens_in, out)` computes USD from a model-substring → (input, output) $/1M-tok table (qwen/llama/gemma/gemini entries + wildcard fallback), overridable via env `LLM_COST_TABLE_JSON`. `record_usage` now writes real `estimated_cost` (was hardcoded 0). `/usage/summary` returns `est_cost_usd` totals + per-model; dashboard swaps cache-rate card for **Est. cost** and adds a cost column to the model table. Verified E2E: one chat run (245 in / 843 out tok) → `$0.000277` recorded and surfaced. 50/50 tests pass.
 
 **Phase 25 — Token-by-token answer streaming.** `GroqProvider.generate_stream` (SSE) with stream-safe `<think>` filter across chunk boundaries; `SYNTHESIS_DELTA`/`SYNTHESIS_DONE` emitted on the workflow WS channel during multi-step chat runs (blocking-generate fallback + same 429 backoff); chat pending bubble renders synthesis live with blinking caret. Fixed latent `emit` NameError in `chat.py` failure path. Verified: 218 deltas matching persisted answer.
 
@@ -26,7 +28,7 @@ Full architecture, security model, and roadmap: see
 
 **Phase 19 — Specialized agents (Research / Data / Writer).** `research-agent` (sub-questions → multi-search → cross-check → cited synthesis), `data-agent` (CSV/Excel via LLM-generated pandas in sandbox), `writer-agent` (structured markdown reports). Registered in registry + executor + `/agents/run` + builder palette (7 agents). CSV/XLSX/TXT upload allowlist; pandas+openpyxl; Groq `<think>` strip + 429 backoff; templates: Deep Research Report, CSV Analysis Report, Multi-Source Brief. Verified with real runs (6-source cited report; sandbox `exit_code=0` describe() output).
 
-> **Deployment status:** not deployed yet — everything currently runs locally via `docker compose` (`http://localhost:3000` web, `http://localhost:8000/docs` API). Deployment configs are prepped for later: `docs/DEPLOYMENT.md`, `render.yaml`, `fly.worker.toml`. Next up after build-out: RAG golden-set evals (needs real embeddings), streaming synthesis in the workflow builder (chat already streams).
+> **Deployment status:** not deployed yet — everything currently runs locally via `docker compose` (`http://localhost:3000` web, `http://localhost:8000/docs` API). Deployment configs are prepped for later: `docs/DEPLOYMENT.md`, `render.yaml`, `fly.worker.toml`. Next up: RAG golden-set evals (needs real embeddings), hybrid search + rerank.
 
 ## Monorepo layout
 

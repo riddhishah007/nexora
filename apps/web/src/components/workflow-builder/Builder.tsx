@@ -505,6 +505,30 @@ export function Builder() {
             </div>
           )}
 
+          {/* Phase 27: live synthesis streaming (parity with chat PendingRunBubble) */}
+          {(executing || stream.synthesis) && (
+            <div className="mt-4 rounded-lg border bg-muted/30 p-2.5">
+              <p className="mb-1 flex items-center gap-1.5 text-xs font-medium">
+                Synthesis
+                {executing && !stream.finalReady && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
+                {stream.finalReady && <Check className="h-3 w-3 text-emerald-500" />}
+                {stream.connected && !stream.finalReady && stream.synthesis && (
+                  <span className="ml-auto h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                )}
+              </p>
+              {stream.synthesis ? (
+                <div className="whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground">
+                  {stream.synthesis}
+                  {!stream.finalReady && <span className="ml-0.5 inline-block h-3 w-[2px] animate-pulse bg-primary align-middle" />}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {stream.connected ? "Waiting for synthesis…" : executing ? "Connecting…" : "—"}
+                </p>
+              )}
+            </div>
+          )}
+
           {result && (
             <Card className="mt-4">
               <CardHeader className="pb-2">
