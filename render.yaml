@@ -1,45 +1,25 @@
-# Render Blueprint for Nexora — permanent deployment
-# Connect this repo to Render (https://dashboard.render.com/blueprints) and it will create all services.
-# Then set the secrets below in Render dashboard > Environment.
-
-databases:
-  - name: nexora-postgres
-    plan: starter
-    ipAllowList: []
-    # Note: Render managed Postgres may not have pgvector pre-installed.
-    # If migration CREATE EXTENSION vector fails, switch this DB to a Docker pserv
-    # with image pgvector/pgvector:pg16 via infrastructure/docker/postgres/Dockerfile
-    # and set DATABASE_URL manually to postgresql://nexora:<password>@nexora-postgres:5432/nexora
+# Render Blueprint for Nexora — Phase 34 Path A ($0 Free Permanent)
+# Frontend: Vercel Hobby ($0). Backend: single Free web service (merged api+worker) + Supabase (pgvector) + Upstash (Redis).
+# See docs/DEPLOYMENT.md Option A — Free. No Render Postgres/Redis (they expire/cost); use Supabase/Upstash instead.
+# Worker is merged into core-api lifespan (app/main.py) — no separate worker service on Free tier (Free has no `type: worker`).
 
 services:
-  # --- Redis ---
-  - type: redis
-    name: nexora-redis
-    plan: starter
-    maxmemoryPolicy: allkeys-lru
-    ipAllowList: []
-
-  # --- Core API (FastAPI, runs alembic + uvicorn) ---
+  # --- Core API (FastAPI + merged worker) — SINGLE Free web service ---
   - type: web
     name: nexora-core-api
     env: docker
     dockerfilePath: ./services/core-api/Dockerfile
-    dockerContext: ./services/core-api
-    plan: starter
+    dockerContext: .
+    plan: free
     healthCheckPath: /health
     autoDeploy: false
     envVars:
       - key: ENVIRONMENT
         value: production
       - key: DATABASE_URL
-        fromDatabase:
-          name: nexora-postgres
-          property: connectionString
+        sync: false  # Supabase pgvector URI: postgresql://postgres.<ref>:<pass>@aws-0-ap-south-1.pooler.supabase.com:5432/postgres
       - key: REDIS_URL
-        fromService:
-          name: nexora-redis
-          type: redis
-          property: connectionString
+        sync: false  # Upstash Redis URL: redis://default:<pass>@<host>:6379 or rediss://
       - key: JWT_SECRET
         generateValue: true
       - key: REFRESH_TOKEN_SECRET
@@ -47,51 +27,14 @@ services:
       - key: LLM_PROVIDER
         value: groq
       - key: GROQ_API_KEY
-        sync: false  # set in dashboard
+        sync: false  # set in dashboard: https://console.groq.com
       - key: GEMINI_API_KEY
-        sync: false
+        sync: false  # optional, for real embeddings text-embedding-004
       - key: SEARCH_API_KEY
-        sync: false
+        sync: false  # Tavily https://tavily.com
       - key: CORS_ALLOWED_ORIGINS
-        value: https://nexora.vercel.app
+        value: https://nexora.vercel.app  # update after Vercel deploy to your actual vercel.app URL
 
-  # --- Worker (same image as core-api + worker code) ---
-  - type: worker
-    name: nexora-worker
-    env: docker
-    dockerfilePath: ./services/worker/Dockerfile
-    dockerContext: .
-    plan: starter
-    autoDeploy: false
-    envVars:
-      - key: ENVIRONMENT
-        value: production
-      - key: DATABASE_URL
-        fromDatabase:
-          name: nexora-postgres
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          name: nexora-redis
-          type: redis
-          property: connectionString
-      - key: LLM_PROVIDER
-        value: groq
-      - key: GROQ_API_KEY
-        sync: false
-      - key: GEMINI_API_KEY
-        sync: false
-
-  # --- Web (Next.js) — prefer Vercel, but also deployable on Render as static ---
-  - type: web
-    name: nexora-web
-    env: node
-    plan: starter
-    rootDir: apps/web
-    buildCommand: npm ci && npm run build
-    startCommand: npm start
-    healthCheckPath: /
-    autoDeploy: false
-    envVars:
-      - key: NEXT_PUBLIC_API_URL
-        value: https://nexora-core-api.onrender.com/api/v1
+# NOTE: No databases / redis / worker / web services here — they would require Starter plan.
+# If you want a paid always-on deploy later, switch this service to plan: starter and optionally
+# re-add a separate worker + managed postgres/redis. For $0, keep it as above.

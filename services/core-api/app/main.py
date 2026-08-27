@@ -1,3 +1,5 @@
+import asyncio
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -7,6 +9,8 @@ import app.models  # noqa: F401 — ensure model metadata is registered
 from app.config import settings
 from app.database import engine
 from app.middleware.request_id import RequestIdMiddleware
+
+logger = logging.getLogger(__name__)
 from app.routers import (
     agents,
     auth,
@@ -29,7 +33,35 @@ from app.routers import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Phase 34 Path A — merged worker ($0 free tier: no separate worker service on Render Free).
+    # Runs the same queue consumer as services/worker/app/worker.py:130 main()
+    # inside the API process so a single Free web service handles both API + RAG ingest.
+    worker_task: asyncio.Task | None = None
+    if settings.environment != "test":
+        try:
+            # Import lazily so `pytest` without redis still collects
+            from worker.worker import main as worker_main  # type: ignore
+
+            worker_task = asyncio.create_task(worker_main())
+            logger.info("[lifespan] merged worker started")
+        except Exception as exc:  # worker optional — API still serves if worker fails to start
+            logger.warning("[lifespan] merged worker not started: %s", exc)
+            # Fallback: try `app.worker` if code was vendored into core-api (Dockerfile copy)
+            try:
+                from app.worker import main as app_worker_main  # type: ignore
+
+                worker_task = asyncio.create_task(app_worker_main())
+                logger.info("[lifespan] merged worker (app.worker) started")
+            except Exception as exc2:
+                logger.warning("[lifespan] worker fallback also failed: %s", exc2)
     yield
+    if worker_task is not None:
+        worker_task.cancel()
+        try:
+            await worker_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("[lifespan] merged worker stopped")
     await engine.dispose()
 
 
