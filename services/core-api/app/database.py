@@ -1,6 +1,6 @@
 from collections.abc import AsyncGenerator
 
-from sqlalchemy.ext.asyncio import (
+from sqlalchemy.ext.asyncio import (  # pyright: ignore[reportMissingImports]
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
@@ -14,6 +14,7 @@ def _create_engine():
         settings.database_url,
         echo=settings.environment == "development",
         pool_pre_ping=True,
+        connect_args={"statement_cache_size": 0},
     )
 
 
