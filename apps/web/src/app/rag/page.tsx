@@ -8,6 +8,7 @@ import { ArrowLeft, Database, FileText, Search, SlidersHorizontal } from "lucide
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { AppShell } from "@/components/app-shell";
 import { apiFetch, getToken } from "@/lib/api";
 
 type RagHit = {
@@ -67,7 +68,8 @@ export default function RagInspectorPage() {
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col gap-6 px-6 py-8">
+    <AppShell>
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-8">
       <header className="flex flex-wrap items-center gap-3">
         <Link href="/chat">
           <Button variant="ghost" size="sm">
@@ -193,6 +195,7 @@ export default function RagInspectorPage() {
           </CardContent>
         </Card>
       )}
-    </div>
+      </div>
+    </AppShell>
   );
 }

@@ -7,6 +7,7 @@ import { ArrowRight, Clock, Layers, Play, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AppShell } from "@/components/app-shell";
 import { apiFetch, getToken, type Template, type Workflow } from "@/lib/api";
 
 export default function WorkflowsPage() {
@@ -35,14 +36,17 @@ export default function WorkflowsPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-6xl px-6 py-12">
-        <p className="text-sm text-muted-foreground">Loading workflows…</p>
-      </div>
+      <AppShell>
+        <div className="mx-auto max-w-6xl px-6 py-12">
+          <p className="text-sm text-muted-foreground">Loading workflows…</p>
+        </div>
+      </AppShell>
     );
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-8">
+    <AppShell>
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-8">
       <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Workflows</h1>
@@ -136,7 +140,8 @@ export default function WorkflowsPage() {
           </div>
         )}
       </section>
-    </div>
+      </div>
+    </AppShell>
   );
 }
 

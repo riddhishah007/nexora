@@ -7,6 +7,7 @@ import { ArrowLeft, Activity, Coins, Gauge, Zap } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AppShell } from "@/components/app-shell";
 import { apiFetch, getToken } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -61,7 +62,8 @@ export default function DashboardPage() {
   const cacheRate = summary && summary.total_calls > 0 ? Math.round((summary.cached_calls / summary.total_calls) * 100) : 0;
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col gap-6 px-6 py-8">
+    <AppShell>
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-8">
       <header className="flex flex-wrap items-center gap-3">
         <Link href="/chat">
           <Button variant="ghost" size="sm">
@@ -152,7 +154,8 @@ export default function DashboardPage() {
           </Card>
         </>
       )}
-    </div>
+      </div>
+    </AppShell>
   );
 }
 
