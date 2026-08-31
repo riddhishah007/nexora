@@ -33,7 +33,7 @@ services:
       - key: SEARCH_API_KEY
         sync: false  # Tavily https://tavily.com
       - key: CORS_ALLOWED_ORIGINS
-        value: https://nexora.vercel.app  # update after Vercel deploy to your actual vercel.app URL
+        value: https://web-nine-snowy-57.vercel.app,https://web-c16mgkgmq-riddhishah001001-gmailcoms-projects.vercel.app  # Vercel prod URLs 2026-08-31 — update if you add custom domain
 
 # NOTE: No databases / redis / worker / web services here — they would require Starter plan.
 # If you want a paid always-on deploy later, switch this service to plan: starter and optionally
