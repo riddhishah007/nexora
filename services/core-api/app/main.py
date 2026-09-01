@@ -13,14 +13,17 @@ from app.middleware.request_id import RequestIdMiddleware
 logger = logging.getLogger(__name__)
 from app.routers import (
     agents,
+    approvals,
     auth,
     chat,
     code,
     documents,
+    exports,
     health,
     jobs,
     llm,
     metrics,
+    notifications,
     pdf,
     projects,
     rag,
@@ -99,6 +102,9 @@ app.include_router(security.router, prefix="/api/v1")
 app.include_router(workflows.router, prefix="/api/v1")
 app.include_router(usage.router, prefix="/api/v1")
 app.include_router(projects.router, prefix="/api/v1")
+app.include_router(approvals.router, prefix="/api/v1")
+app.include_router(notifications.router, prefix="/api/v1")
+app.include_router(exports.router, prefix="/api/v1")
 
 
 @app.get("/")

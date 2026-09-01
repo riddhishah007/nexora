@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bot, Database, LogOut, MessageSquare, Workflow, GitBranch, BarChart3, FolderKanban, Files, BotIcon, Shield, Store, History, BookOpen } from "lucide-react";
+import { Bot, Database, LogOut, MessageSquare, Workflow, GitBranch, BarChart3, FolderKanban, Files, BotIcon, Shield, Store, History, BookOpen, Bell, CheckCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/logo";
@@ -20,6 +20,8 @@ const NAV = [
   { href: "/rag", label: "RAG", icon: Database },
   { href: "/security", label: "Security", icon: Shield },
   { href: "/history", label: "History", icon: History },
+  { href: "/approvals", label: "Approvals", icon: CheckCircle },
+  { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/marketplace", label: "Marketplace", icon: Store },
   { href: "/dashboard", label: "Usage", icon: BarChart3 },
 ] as const;
