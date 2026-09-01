@@ -12,7 +12,6 @@ Run via: python -m worker.worker  (WORKDIR /app, PYTHONPATH /app)
 
 import asyncio
 import json
-import time
 import uuid
 
 from sqlalchemy import select
@@ -117,7 +116,7 @@ async def handle_job(job_id: str):
                 except Exception:
                     pass
             else:
-                job.status = JOB_FAILED if "not found" not in err.lower() else JOB_FAILED
+                job.status = JOB_DEAD
                 job.error = err
                 await db.commit()
                 print(f"[worker] job {job.id} dead after {job.attempts} attempts")
