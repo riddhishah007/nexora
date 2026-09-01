@@ -38,7 +38,9 @@ export default function ShowcasePage() {
             <Link href={LIVE_WEB} target="_blank"><Button><ExternalLink className="h-4 w-4" /> Live App</Button></Link>
             <Link href={`${LIVE_API}/docs`} target="_blank"><Button variant="outline"><ExternalLink className="h-4 w-4" /> API Docs</Button></Link>
             <Link href="https://github.com/riddhishah007/nexora" target="_blank"><Button variant="outline">GitHub</Button></Link>
+            <Link href="https://www.loom.com/share/your-video-id" target="_blank"><Button variant="outline"><Play className="h-4 w-4" /> Watch 2-min Demo (Loom — add link after recording)</Button></Link>
           </div>
+          <p className="text-xs text-muted-foreground">Script: <span className="font-mono">docs/DEMO_VIDEO_SCRIPT.md:1</span> · Keep-alive: <span className="font-mono">scripts/keepalive.py:1</span> + <span className="font-mono">.github/workflows/keepalive.yml:1</span> (every 10 min, disable if you prefer cold starts)</p>
           <div className="grid gap-2 font-mono text-xs text-muted-foreground sm:grid-cols-2">
             <span>API: {LIVE_API}</span><span>Web: {LIVE_WEB}</span>
             <span>Health: {LIVE_API}/health + X-Request-ID · Metrics: /metrics</span><span>Smoke: python scripts/smoke.py --base {LIVE_API} → 7 PASS</span>
@@ -77,7 +79,7 @@ export default function ShowcasePage() {
             </CardContent>
           </Card>
           <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2 text-sm"><Cpu className="h-4 w-4" /> Routes (20)</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="flex items-center gap-2 text-sm"><Cpu className="h-4 w-4" /> Routes (21)</CardTitle></CardHeader>
             <CardContent className="font-mono text-xs leading-relaxed text-muted-foreground">
               <div>/chat (streaming + WS) · /projects · /files · /knowledge · /rag</div>
               <div>/workflows + /workflows/builder · /agents · /security · /history</div>

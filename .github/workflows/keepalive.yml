@@ -1,0 +1,27 @@
+name: Keepalive (Render Free)
+
+# Pings the live API every 10 min to avoid the 15-min sleep on Render Free.
+# Free tier quota: 750h/mo, single service ~720h/mo (docs/DEPLOYMENT.md:45).
+# This costs ~0 extra — it just keeps the service warm. Disable the workflow
+# (Actions → Keepalive → Disable) if you prefer cold starts.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"  # every 10 min UTC
+  workflow_dispatch: {}  # manual run button
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install httpx
+        run: pip install httpx
+      - name: Ping live health + metrics
+        run: python scripts/keepalive.py --base https://nexora-core-api.onrender.com --timeout 20
+      - name: Also run offline smoke sanity
+        run: python scripts/smoke.py --base https://nexora-core-api.onrender.com --timeout 15
