@@ -58,6 +58,7 @@ export type AgentInfo = {
   permissions: string[];
   model: string;
   status: string;
+  version: string;
 };
 
 export type WorkflowStep = {
@@ -114,4 +115,31 @@ export type ChatResponse = {
     depends_on: number[];
     status: string;
   }[];
+};
+
+export type Project = {
+  id: string;
+  name: string;
+  description: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DocumentInfo = {
+  id: string;
+  original_filename: string;
+  content_type: string;
+  size_bytes: number;
+  page_count: number | null;
+  status: string;
+};
+
+export type SecurityEvent = {
+  id: string;
+  event_type: string;
+  risk_level: string;
+  blocked: boolean;
+  details: Record<string, unknown> | null;
+  created_at: string;
 };

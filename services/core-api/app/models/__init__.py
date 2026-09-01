@@ -5,6 +5,7 @@ from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.job import Job
 from app.models.organization import Organization
+from app.models.project import Project
 from app.models.security_event import AuditLog, SecurityEvent
 from app.models.tool_call import ToolCall
 from app.models.user import User, UserSession
@@ -20,6 +21,7 @@ __all__ = [
     "Job",
     "Message",
     "Organization",
+    "Project",
     "SecurityEvent",
     "ToolCall",
     "User",

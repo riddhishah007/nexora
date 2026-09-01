@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bot, Database, LayoutDashboard, LogOut, MessageSquare, Workflow, GitBranch, BarChart3 } from "lucide-react";
+import { Bot, Database, LogOut, MessageSquare, Workflow, GitBranch, BarChart3, FolderKanban, Files, BotIcon, Shield, Store } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/logo";
@@ -11,9 +11,14 @@ import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/chat", label: "Chat", icon: MessageSquare },
+  { href: "/projects", label: "Projects", icon: FolderKanban },
+  { href: "/files", label: "Files", icon: Files },
   { href: "/workflows", label: "Workflows", icon: Workflow },
   { href: "/workflows/builder", label: "Builder", icon: GitBranch },
+  { href: "/agents", label: "Agents", icon: BotIcon },
   { href: "/rag", label: "RAG", icon: Database },
+  { href: "/security", label: "Security", icon: Shield },
+  { href: "/marketplace", label: "Marketplace", icon: Store },
   { href: "/dashboard", label: "Usage", icon: BarChart3 },
 ] as const;
 

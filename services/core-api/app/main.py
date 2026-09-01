@@ -22,6 +22,7 @@ from app.routers import (
     llm,
     metrics,
     pdf,
+    projects,
     rag,
     realtime,
     security,
@@ -97,6 +98,7 @@ app.include_router(jobs.router, prefix="/api/v1")
 app.include_router(security.router, prefix="/api/v1")
 app.include_router(workflows.router, prefix="/api/v1")
 app.include_router(usage.router, prefix="/api/v1")
+app.include_router(projects.router, prefix="/api/v1")
 
 
 @app.get("/")
